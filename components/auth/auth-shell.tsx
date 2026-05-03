@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   subtitle: {
-    color: palette.textMuted,
+    color: palette.onSurfaceVariant,
     fontSize: typography.body,
     lineHeight: 24,
     maxWidth: 320,
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: palette.surface,
-    borderColor: palette.border,
+    borderColor: palette.outlineVariant,
     borderRadius: radius.lg,
     borderWidth: 1,
     elevation: 3,

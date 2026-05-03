@@ -1,144 +1,352 @@
 import { Link, router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text } from 'react-native';
+import {
+  Alert,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
-import { ScreenContainer } from '@/components/app/screen-container';
-import { AuthShell } from '@/components/auth/auth-shell';
-import { FormField } from '@/components/auth/form-field';
-import { palette, radius, typography } from '@/constants/app-theme';
-import { validateEmail, validatePassword, validateRequired } from '@/features/auth/validation';
+import { AppLogo } from '@/components/app/app-logo';
+import {
+  AuthBackground,
+  AuthButton,
+  AuthCard,
+  AuthHeader,
+  AuthSelectField,
+  AuthTextField,
+  ConsentRow,
+  SplitAuthLayout,
+} from '@/components/auth/auth-primitives';
+import {
+  africanCountries,
+  africanCountryOptions,
+  africanDialCodeOptions,
+} from '@/constants/african-countries';
+import { palette, spacing, typography } from '@/constants/app-theme';
+import {
+  validateEmail,
+  validateName,
+  validatePhoneCountryCode,
+  validatePhoneNumber,
+  validateRequired,
+} from '@/features/auth/validation';
 import { useAuth } from '@/providers/auth-provider';
+import { useToast } from '@/providers/toast-provider';
+
+type TouchedFields = {
+  acceptedTerms: boolean;
+  countryOfResidence: boolean;
+  email: boolean;
+  firstName: boolean;
+  lastName: boolean;
+  phoneCountryCode: boolean;
+  phoneNumber: boolean;
+  referralCode: boolean;
+};
 
 export default function RegisterScreen() {
-  const { register } = useAuth();
+  const { loginWithGoogle, register } = useAuth();
+  const { showToast } = useToast();
+  const { width } = useWindowDimensions();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [territory, setTerritory] = useState('');
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+254');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [countryOfResidence, setCountryOfResidence] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [touched, setTouched] = useState<TouchedFields>({
+    acceptedTerms: false,
+    countryOfResidence: false,
+    email: false,
+    firstName: false,
+    lastName: false,
+    phoneCountryCode: false,
+    phoneNumber: false,
+    referralCode: false,
+  });
+
+  const selectedDialCode = useMemo(
+    () => africanCountries.find((country) => country.dialCode === phoneCountryCode),
+    [phoneCountryCode]
+  );
 
   const errors = useMemo(
     () => ({
-      firstName: validateRequired(firstName, 'First name'),
-      lastName: validateRequired(lastName, 'Last name'),
-      territory: validateRequired(territory, 'Territory'),
+      firstName: validateName(firstName, 'First name'),
+      lastName: validateName(lastName, 'Last name'),
+      phoneNumber: validatePhoneNumber(phoneNumber, selectedDialCode?.phoneNumberLengths ?? [10]),
+      phoneCountryCode: validatePhoneCountryCode(phoneCountryCode),
+      countryOfResidence: validateRequired(countryOfResidence, 'Country of residence'),
       email: validateEmail(email),
-      password: validatePassword(password),
+      acceptedTerms: acceptedTerms ? '' : 'You need to accept the terms to continue.',
     }),
-    [email, firstName, lastName, password, territory]
+    [
+      acceptedTerms,
+      countryOfResidence,
+      email,
+      firstName,
+      lastName,
+      phoneCountryCode,
+      phoneNumber,
+      selectedDialCode?.phoneNumberLengths,
+    ]
   );
 
   const canSubmit = Object.values(errors).every((value) => !value);
+  const useSplitLayout = Platform.OS === 'web' && width >= 1024;
 
-  async function handleSubmit() {
+  function markTouched(field: keyof TouchedFields) {
+    setTouched((current) => ({ ...current, [field]: true }));
+  }
+
+  function getFieldError(field: keyof typeof errors) {
+    return touched[field] ? errors[field] : '';
+  }
+
+  async function handleRegister() {
     if (!canSubmit || submitting) {
+      setTouched({
+        acceptedTerms: true,
+        countryOfResidence: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phoneCountryCode: true,
+        phoneNumber: true,
+        referralCode: true,
+      });
+      return;
+    }
+
+    let didNavigate = false;
+
+    try {
+      setSubmitting(true);
+      await register({
+        countryOfResidence,
+        email,
+        firstName,
+        lastName,
+        phoneCountryCode,
+        phoneNumber,
+        referralCode,
+      });
+      didNavigate = true;
+      router.replace({
+        params: { registered: '1' },
+        pathname: '/login',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Please try again.';
+      showToast(message, 'error');
+      Alert.alert('Registration failed', message);
+    } finally {
+      if (!didNavigate) {
+        setSubmitting(false);
+      }
+    }
+  }
+
+  async function handleGoogleRegister() {
+    if (googleSubmitting || submitting) {
       return;
     }
 
     try {
-      setSubmitting(true);
-      await register({ email, firstName, lastName, password, territory });
+      setGoogleSubmitting(true);
+      await loginWithGoogle();
+      showToast('Signed in with Google.');
       router.replace('/dashboard');
-    } catch {
-      Alert.alert('Registration failed', 'Please try again.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to start Google sign-in.';
+      showToast(message, 'error');
+      Alert.alert('Google sign-in failed', message);
     } finally {
-      setSubmitting(false);
+      setGoogleSubmitting(false);
     }
   }
 
-  return (
-    <ScreenContainer>
-      <AuthShell
-        footer={
-          <Text style={styles.footerText}>
-            Already have an account?{' '}
-            <Link href="/login" style={styles.footerLink}>
-              Log in
-            </Link>
-          </Text>
-        }
-        subtitle="Create an account for your sales team with clear ownership and room for future policy controls."
-        title="Create your account">
-        <FormField
+  const content = (
+    <AuthCard scrollable>
+      {!useSplitLayout ? (
+        <View style={styles.mobileLogoWrap}>
+          <AppLogo compact />
+        </View>
+      ) : null}
+      <AuthHeader
+        subtitle="Enter your details to get started with ManagePro."
+        title="Create an Account"
+      />
+      <View style={styles.formStack}>
+        <AuthTextField
           autoCapitalize="words"
-          error={firstName ? errors.firstName : ''}
-          icon="badge"
-          label="First name"
-          placeholder="Amina"
+          error={getFieldError('firstName')}
+          label="First Name"
+          placeholder="Enter your first name"
           value={firstName}
+          onBlur={() => markTouched('firstName')}
           onChangeText={setFirstName}
         />
-        <FormField
+        <AuthTextField
           autoCapitalize="words"
-          error={lastName ? errors.lastName : ''}
-          icon="person-outline"
-          label="Last name"
-          placeholder="Otieno"
+          error={getFieldError('lastName')}
+          label="Last Name"
+          placeholder="Enter your last name"
           value={lastName}
+          onBlur={() => markTouched('lastName')}
           onChangeText={setLastName}
         />
-        <FormField
-          autoCapitalize="words"
-          error={territory ? errors.territory : ''}
-          icon="public"
-          label="Territory"
-          placeholder="Nairobi Flagship"
-          value={territory}
-          onChangeText={setTerritory}
-        />
-        <FormField
-          error={email ? errors.email : ''}
-          icon="mail"
+        <AuthTextField
+          autoCapitalize="none"
+          error={getFieldError('email')}
+          label="Email Address"
           keyboardType="email-address"
-          label="Email address"
-          placeholder="agent@salespro.com"
+          placeholder="name@company.com"
           value={email}
+          onBlur={() => markTouched('email')}
           onChangeText={setEmail}
         />
-        <FormField
-          error={password ? errors.password : ''}
-          icon="lock"
-          label="Password"
-          placeholder="At least 8 characters"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
+        <Text style={styles.groupLabel}>Phone Number</Text>
+        <View style={styles.phoneRow}>
+          <AuthSelectField
+            containerStyle={styles.phoneCodeField}
+            error={getFieldError('phoneCountryCode')}
+            label="Code"
+            options={africanDialCodeOptions}
+            placeholder="Select code"
+            value={phoneCountryCode}
+            onSelect={(value) => {
+              setPhoneCountryCode(value);
+              markTouched('phoneCountryCode');
+            }}
+          />
+          <AuthTextField
+            containerStyle={styles.phoneNumberField}
+            error={getFieldError('phoneNumber')}
+            keyboardType="number-pad"
+            label="Number"
+            placeholder={selectedDialCode?.phoneNumberLengths[0] === 8 ? '71234567' : '712345678'}
+            value={phoneNumber}
+            onBlur={() => markTouched('phoneNumber')}
+            onChangeText={(value) => setPhoneNumber(value.replace(/\D/g, ''))}
+          />
+        </View>
+        <AuthSelectField
+          error={getFieldError('countryOfResidence')}
+          label="Country of Residence"
+          options={africanCountryOptions}
+          placeholder="Select your country"
+          value={countryOfResidence}
+          onSelect={(value) => {
+            setCountryOfResidence(value);
+            markTouched('countryOfResidence');
+          }}
         />
-
-        <Pressable
+        <AuthTextField
+          autoCapitalize="characters"
+          label="Referral Code"
+          optionalLabel="(Optional)"
+          placeholder="e.g. AGENT2024"
+          value={referralCode}
+          onBlur={() => markTouched('referralCode')}
+          onChangeText={setReferralCode}
+        />
+        <ConsentRow
+          value={acceptedTerms}
+          onValueChange={(value) => {
+            setAcceptedTerms(value);
+            markTouched('acceptedTerms');
+          }}
+        />
+        {touched.acceptedTerms && errors.acceptedTerms ? (
+          <Text style={styles.errorText}>{errors.acceptedTerms}</Text>
+        ) : null}
+        <AuthButton
           disabled={!canSubmit || submitting}
-          style={[styles.submitButton, !canSubmit || submitting ? styles.submitButtonDisabled : null]}
-          onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>{submitting ? 'Creating account...' : 'Register'}</Text>
-        </Pressable>
-      </AuthShell>
-    </ScreenContainer>
+          loading={submitting}
+          title={submitting ? 'Creating account...' : 'Create Account'}
+          onPress={handleRegister}
+        />
+        <AuthButton
+          disabled={googleSubmitting || submitting}
+          loading={googleSubmitting}
+          title={googleSubmitting ? 'Opening Google...' : 'Continue with Google'}
+          variant="secondary"
+          onPress={handleGoogleRegister}
+        />
+      </View>
+      <View style={styles.bottomTextWrap}>
+        <Text style={styles.bottomText}>
+          Already have an account?{' '}
+          <Link href="/login" style={styles.bottomLink}>
+            Log in here
+          </Link>
+        </Text>
+      </View>
+    </AuthCard>
+  );
+
+  return (
+    <>
+      <StatusBar style="light" />
+      <AuthBackground contentStyle={styles.registerContent} scroll={false}>
+        {useSplitLayout ? <SplitAuthLayout>{content}</SplitAuthLayout> : content}
+      </AuthBackground>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  submitButton: {
-    alignItems: 'center',
-    backgroundColor: palette.primary,
-    borderRadius: radius.md,
-    justifyContent: 'center',
-    minHeight: 54,
+  bottomLink: {
+    color: palette.primary,
+    fontWeight: '500',
   },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    color: palette.white,
-    fontSize: typography.title,
-    fontWeight: '700',
-  },
-  footerText: {
-    color: palette.textMuted,
+  bottomText: {
+    color: palette.onSurfaceVariant,
     fontSize: typography.bodySmall,
+    textAlign: 'center',
   },
-  footerLink: {
-    color: palette.accent,
+  bottomTextWrap: {
+    marginTop: spacing.lg,
+  },
+  errorText: {
+    color: palette.error,
+    fontSize: typography.label,
+    lineHeight: 16,
+  },
+  formStack: {
+    gap: spacing.md,
+  },
+  groupLabel: {
+    color: palette.onSurface,
+    fontSize: typography.label,
     fontWeight: '700',
+    letterSpacing: 0.24,
+  },
+  mobileLogoWrap: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  phoneCodeField: {
+    flex: 0.42,
+    minWidth: 80,
+  },
+  phoneNumberField: {
+    flex: 1.78,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  registerContent: {
+    paddingVertical: spacing.marginMobile,
   },
 });

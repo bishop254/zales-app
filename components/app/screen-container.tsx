@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { KeyboardResponsiveView } from '@/components/app/keyboard-responsive-view';
 import { palette, spacing } from '@/constants/app-theme';
 
 type ScreenContainerProps = {
@@ -14,15 +15,9 @@ export function ScreenContainer({ children, scroll = true }: ScreenContainerProp
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      {scroll ? (
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
-          {content}
-        </ScrollView>
-      ) : (
-        content
-      )}
+      <KeyboardResponsiveView contentContainerStyle={styles.scrollContent} scroll={scroll}>
+        {content}
+      </KeyboardResponsiveView>
     </SafeAreaView>
   );
 }

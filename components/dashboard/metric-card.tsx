@@ -21,7 +21,7 @@ export function MetricCard({ label, trend, value }: MetricCardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: palette.surface,
-    borderColor: palette.border,
+    borderColor: palette.outlineVariant,
     borderRadius: radius.lg,
     borderWidth: 1,
     gap: spacing.sm,
@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   label: {
-    color: palette.textMuted,
+    color: palette.onSurfaceVariant,
     fontSize: typography.bodySmall,
   },
   value: {

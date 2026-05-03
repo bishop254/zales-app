@@ -3,13 +3,20 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 
-export function AppLogo() {
+type AppLogoProps = {
+  tint?: 'dark' | 'light';
+  compact?: boolean;
+};
+
+export function AppLogo({ compact = false, tint = 'dark' }: AppLogoProps) {
+  const isLight = tint === 'light';
+
   return (
     <View style={styles.row}>
-      <View style={styles.badge}>
+      <View style={[styles.badge, compact ? styles.badgeCompact : null]}>
         <MaterialIcons color={palette.white} name="rocket-launch" size={28} />
       </View>
-      <Text style={styles.wordmark}>SalesPro</Text>
+      <Text style={[styles.wordmark, isLight ? styles.wordmarkLight : styles.wordmarkDark]}>ManagePro</Text>
     </View>
   );
 }
@@ -28,9 +35,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
+  badgeCompact: {
+    height: 36,
+    width: 36,
+  },
   wordmark: {
-    color: palette.primary,
     fontSize: typography.title,
     fontWeight: '800',
+  },
+  wordmarkDark: {
+    color: palette.primary,
+  },
+  wordmarkLight: {
+    color: palette.onPrimary,
   },
 });

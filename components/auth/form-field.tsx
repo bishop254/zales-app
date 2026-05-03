@@ -42,13 +42,13 @@ export function FormField({
       </View>
 
       <View style={[styles.inputRow, error ? styles.inputRowError : null]}>
-        <MaterialIcons color={palette.textMuted} name={icon} size={20} />
+        <MaterialIcons color={palette.onSurfaceVariant} name={icon} size={20} />
         <TextInput
           autoCapitalize={autoCapitalize}
           autoCorrect={false}
           keyboardType={keyboardType}
           placeholder={placeholder}
-          placeholderTextColor={palette.textMuted}
+          placeholderTextColor={palette.outlineVariant}
           secureTextEntry={secureTextEntry}
           style={styles.input}
           value={value}
@@ -71,21 +71,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   label: {
-    color: palette.text,
+    color: palette.onSurface,
     fontSize: typography.label,
     fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   action: {
-    color: palette.accent,
+    color: palette.primary,
     fontSize: typography.label,
     fontWeight: '700',
   },
   inputRow: {
     alignItems: 'center',
-    backgroundColor: palette.surfaceMuted,
-    borderColor: palette.border,
+    backgroundColor: palette.surfaceContainerLow,
+    borderColor: palette.outlineVariant,
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     borderColor: '#BA1A1A',
   },
   input: {
-    color: palette.text,
+    color: palette.onSurface,
     flex: 1,
     fontSize: typography.body,
     paddingVertical: spacing.md,
