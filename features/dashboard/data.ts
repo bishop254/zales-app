@@ -62,19 +62,19 @@ export const dashboardShortcuts: DashboardShortcut[] = [
 export const recentActivity: ActivityItem[] = [
   {
     id: 'task-assigned',
-    meta: '2 hours ago • Project Alpha',
+    meta: '2 hours ago - Project Alpha',
     title: 'New task assigned',
     type: 'tasks',
   },
   {
     id: 'contract-signed',
-    meta: 'Yesterday • Q4 Partnerships',
+    meta: 'Yesterday - Q4 Partnerships',
     title: 'Contract signed by Global Retailers',
     type: 'contracts',
   },
   {
     id: 'ticket-fixed',
-    meta: 'Oct 24 • ID: #44920',
+    meta: 'Oct 24 - ID: #44920',
     statusLabel: 'FIXED',
     statusTone: 'success',
     title: 'Support ticket resolved',
@@ -83,9 +83,9 @@ export const recentActivity: ActivityItem[] = [
 ];
 
 export const bottomNavItems: BottomNavItem[] = [
+  { icon: 'home-filled', key: 'home', label: 'Home' },
   { icon: 'assignment', key: 'tasks', label: 'Tasks' },
   { icon: 'description', key: 'contracts', label: 'Contracts' },
-  { icon: 'shield', key: 'insurance', label: 'Insurance' },
-  { icon: 'contact-support', key: 'support', label: 'Support' },
+  { icon: 'shield', key: 'covers', label: 'Covers' },
   { icon: 'more-horiz', key: 'more', label: 'More' },
 ];

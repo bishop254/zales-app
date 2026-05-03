@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 import {
@@ -8,19 +8,33 @@ import {
   AuthButton,
   AuthCard,
   AuthHeader,
-  OtpInputRow,
 } from '@/components/auth/auth-primitives';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/providers/toast-provider';
 
 export default function VerifyScreen() {
-  const { pendingChallenge, submitOtp } = useAuth();
+  const { pendingChallenge, resendOtpChallenge, submitOtp } = useAuth();
   const { showToast } = useToast();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(26);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   const otpValue = useMemo(() => otp.join(''), [otp]);
+
+  useEffect(() => {
+    if (resendCountdown <= 0) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setResendCountdown((current) => (current <= 1 ? 0 : current - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
 
   if (!pendingChallenge || pendingChallenge.type !== 'otp') {
     return <Redirect href="/login" />;
@@ -34,6 +48,18 @@ export default function VerifyScreen() {
       copy[index] = sanitized;
       return copy;
     });
+  }
+
+  function focusNextInput(index: number, nextValue: string) {
+    if (nextValue && index < otp.length - 1) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  }
+
+  function focusPreviousInput(index: number) {
+    if (!otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
   }
 
   async function handleVerify() {
@@ -55,24 +81,82 @@ export default function VerifyScreen() {
     }
   }
 
+  async function handleResendOtp() {
+    if (resending || resendCountdown > 0) {
+      return;
+    }
+
+    try {
+      setResending(true);
+      await resendOtpChallenge();
+      setOtp(['', '', '', '', '', '']);
+      setResendCountdown(26);
+      inputRefs.current[0]?.focus();
+      showToast('A new OTP has been sent to your email.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to resend OTP.';
+      showToast(message, 'error');
+      Alert.alert('Resend failed', message);
+    } finally {
+      setResending(false);
+    }
+  }
+
   return (
     <>
       <StatusBar style="light" />
       <AuthBackground scroll={false}>
         <AuthCard scrollable styleVariant="compact">
           <View style={styles.iconCircle}>
-            <Text style={styles.iconText}>6</Text>
+            <Text style={styles.iconText}>{String(resendCountdown).padStart(2, '0')}</Text>
           </View>
           <AuthHeader
             centered
             subtitle={`Enter the 6-digit code sent to ${pendingChallenge.email}.`}
             title="Verify your login"
           />
-          <OtpInputRow value={otp} onChangeDigit={handleChangeDigit} />
-          <View style={styles.noticeCard}>
-            <Text style={styles.noticeText}>
-              Your OTP is required before we issue the final access token for subsequent logins.
-            </Text>
+          <View style={styles.otpRow}>
+            {otp.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={(node) => {
+                  inputRefs.current[index] = node;
+                }}
+                keyboardType="number-pad"
+                maxLength={1}
+                placeholder="."
+                placeholderTextColor={palette.onSurfaceVariant}
+                style={styles.otpCell}
+                textAlign="center"
+                value={digit}
+                onChangeText={(nextValue) => {
+                  const sanitized = nextValue.replace(/[^0-9]/g, '').slice(-1);
+                  handleChangeDigit(index, sanitized);
+                  focusNextInput(index, sanitized);
+                }}
+                onKeyPress={({ nativeEvent }) => {
+                  if (nativeEvent.key === 'Backspace') {
+                    focusPreviousInput(index);
+                  }
+                }}
+              />
+            ))}
+          </View>
+          <View style={styles.resendRow}>
+            <Text style={styles.resendText}>Didn&apos;t receive the code?</Text>
+            <Pressable disabled={resending || resendCountdown > 0} onPress={handleResendOtp}>
+              <Text
+                style={[
+                  styles.resendButtonText,
+                  resending || resendCountdown > 0 ? styles.resendButtonTextDisabled : null,
+                ]}>
+                {resending
+                  ? 'Resending...'
+                  : resendCountdown > 0
+                    ? `Resend in 00:${String(resendCountdown).padStart(2, '0')}`
+                    : 'Resend OTP'}
+              </Text>
+            </Pressable>
           </View>
           <View style={styles.buttonStack}>
             <AuthButton
@@ -109,18 +193,39 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
   },
-  noticeCard: {
-    backgroundColor: palette.surfaceContainerLow,
+  otpCell: {
+    backgroundColor: palette.glassSoft,
     borderColor: palette.outlineVariant,
     borderRadius: radius.md,
     borderWidth: 1,
-    marginTop: spacing.lg,
-    padding: spacing.md,
+    color: palette.onSurface,
+    fontSize: typography.headline,
+    fontWeight: '600',
+    height: 60,
+    width: 46,
   },
-  noticeText: {
+  otpRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    justifyContent: 'space-between',
+  },
+  resendButtonText: {
+    color: palette.primary,
+    fontSize: typography.label,
+    fontWeight: '700',
+  },
+  resendButtonTextDisabled: {
+    color: palette.onSurfaceVariant,
+  },
+  resendRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+  },
+  resendText: {
     color: palette.onSurfaceVariant,
     fontSize: typography.bodySmall,
-    lineHeight: 20,
-    textAlign: 'center',
   },
 });

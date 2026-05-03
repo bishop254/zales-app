@@ -16,6 +16,7 @@ import {
   AuthButton,
   AuthCard,
   AuthHeader,
+  AuthSearchSelectField,
   AuthSelectField,
   AuthTextField,
   ConsentRow,
@@ -239,11 +240,12 @@ export default function RegisterScreen() {
             onChangeText={(value) => setPhoneNumber(value.replace(/\D/g, ''))}
           />
         </View>
-        <AuthSelectField
+        <AuthSearchSelectField
           error={getFieldError('countryOfResidence')}
           label="Country of Residence"
           options={africanCountryOptions}
           placeholder="Select your country"
+          searchPlaceholder="Search country"
           value={countryOfResidence}
           onSelect={(value) => {
             setCountryOfResidence(value);

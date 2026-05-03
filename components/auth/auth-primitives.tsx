@@ -64,6 +64,10 @@ type AuthSelectFieldProps = {
   value: string;
 };
 
+type AuthSearchSelectFieldProps = AuthSelectFieldProps & {
+  searchPlaceholder?: string;
+};
+
 type ConsentRowProps = {
   value: boolean;
   onValueChange: (value: boolean) => void;
@@ -296,6 +300,83 @@ export function AuthSelectField({
               </Text>
             </Pressable>
           ))}
+        </View>
+      ) : null}
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+    </View>
+  );
+}
+
+export function AuthSearchSelectField({
+  containerStyle,
+  error,
+  label,
+  onSelect,
+  options,
+  optionalLabel,
+  placeholder,
+  searchPlaceholder = 'Search...',
+  value,
+}: AuthSearchSelectFieldProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const selectedLabel = options.find((option) => option.value === value)?.label;
+  const filteredOptions = options.filter((option) =>
+    option.label.toLowerCase().includes(query.trim().toLowerCase())
+  );
+
+  return (
+    <View style={[styles.fieldBlock, containerStyle]}>
+      <View style={styles.fieldLabelRow}>
+        <Text style={[styles.fieldLabel, error ? styles.fieldLabelError : null]}>{label}</Text>
+        {optionalLabel ? <Text style={styles.optionalLabel}>{optionalLabel}</Text> : null}
+      </View>
+      <Pressable
+        style={[styles.inputShell, error ? styles.inputShellError : null]}
+        onPress={() => setOpen((current) => !current)}>
+        <Text
+          numberOfLines={1}
+          style={[styles.selectValue, !selectedLabel ? styles.selectPlaceholder : null]}>
+          {selectedLabel ?? placeholder}
+        </Text>
+        <MaterialIcons
+          color={palette.onSurfaceVariant}
+          name={open ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+          size={20}
+        />
+      </Pressable>
+      {open ? (
+        <View style={styles.optionsPanel}>
+          <View style={styles.searchInputWrap}>
+            <MaterialIcons color={palette.outline} name="search" size={18} />
+            <TextInput
+              placeholder={searchPlaceholder}
+              placeholderTextColor={palette.outlineVariant}
+              style={styles.searchInput}
+              value={query}
+              onChangeText={setQuery}
+            />
+          </View>
+          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={styles.searchResultsScroll}>
+            {filteredOptions.length ? (
+              filteredOptions.map((option) => (
+                <Pressable
+                  key={option.value}
+                  style={styles.optionRow}
+                  onPress={() => {
+                    onSelect(option.value);
+                    setOpen(false);
+                    setQuery('');
+                  }}>
+                  <Text style={[styles.optionText, option.value === value ? styles.optionTextSelected : null]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))
+            ) : (
+              <Text style={styles.noResultsText}>No matches found.</Text>
+            )}
+          </ScrollView>
         </View>
       ) : null}
       {error ? <Text style={styles.fieldError}>{error}</Text> : null}
@@ -604,6 +685,12 @@ const styles = StyleSheet.create({
     color: palette.primary,
     fontWeight: '700',
   },
+  noResultsText: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   linkText: {
     color: palette.primary,
     fontWeight: '500',
@@ -705,6 +792,24 @@ const styles = StyleSheet.create({
   screen: {
     backgroundColor: palette.deepNavy,
     flex: 1,
+  },
+  searchInput: {
+    color: palette.onSurface,
+    flex: 1,
+    fontSize: typography.bodySmall,
+    minHeight: 40,
+    paddingVertical: 0,
+  },
+  searchInputWrap: {
+    alignItems: 'center',
+    borderBottomColor: palette.outlineVariant,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  searchResultsScroll: {
+    maxHeight: 220,
   },
   splitRoot: {
     alignSelf: 'center',

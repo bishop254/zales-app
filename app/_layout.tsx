@@ -5,6 +5,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '@/providers/auth-provider';
+import { SubscriptionProvider } from '@/providers/subscription-provider';
 import { ToastProvider } from '@/providers/toast-provider';
 
 export default function RootLayout() {
@@ -14,14 +15,18 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <ToastProvider>
         <AuthProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="login" />
-            <Stack.Screen name="register" />
-            <Stack.Screen name="set-password" />
-            <Stack.Screen name="verify" />
-            <Stack.Screen name="dashboard" />
-          </Stack>
+          <SubscriptionProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="login" />
+              <Stack.Screen name="register" />
+              <Stack.Screen name="set-password" />
+              <Stack.Screen name="verify" />
+              <Stack.Screen name="dashboard" />
+              <Stack.Screen name="billing" />
+              <Stack.Screen name="covers" />
+            </Stack>
+          </SubscriptionProvider>
         </AuthProvider>
       </ToastProvider>
       <StatusBar style="auto" />

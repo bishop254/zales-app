@@ -2,15 +2,9 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
 import { apiConfig } from '@/constants/api';
+import { parseApiEnvelope } from '@/features/api/api-client';
 
 WebBrowser.maybeCompleteAuthSession();
-
-type ApiEnvelope<T> = {
-  data: T | null;
-  message: string;
-  status: string;
-  status_code: number;
-};
 
 export type AuthUser = {
   id: string;
@@ -55,16 +49,6 @@ export type OtpChallenge = {
 
 export type LoginResponse = FirstLoginChallenge | OtpChallenge;
 
-async function parseEnvelope<T>(response: Response): Promise<T> {
-  const payload = (await response.json()) as ApiEnvelope<T>;
-
-  if (!response.ok || !payload.data) {
-    throw new Error(payload.message || 'Request failed.');
-  }
-
-  return payload.data;
-}
-
 export async function loginWithBackend(email: string, password: string): Promise<LoginResponse> {
   const response = await fetch(`${apiConfig.baseUrl}/auth/login`, {
     method: 'POST',
@@ -78,7 +62,7 @@ export async function loginWithBackend(email: string, password: string): Promise
     }),
   });
 
-  return parseEnvelope<LoginResponse>(response);
+  return parseApiEnvelope<LoginResponse>(response);
 }
 
 export async function registerWithBackend(payload: RegisterPayload): Promise<RegistrationResponse> {
@@ -99,7 +83,7 @@ export async function registerWithBackend(payload: RegisterPayload): Promise<Reg
     }),
   });
 
-  return parseEnvelope<RegistrationResponse>(response);
+  return parseApiEnvelope<RegistrationResponse>(response);
 }
 
 export async function setFirstPassword(token: string, newPassword: string): Promise<AuthResult> {
@@ -113,7 +97,7 @@ export async function setFirstPassword(token: string, newPassword: string): Prom
     body: JSON.stringify({ newPassword }),
   });
 
-  return parseEnvelope<AuthResult>(response);
+  return parseApiEnvelope<AuthResult>(response);
 }
 
 export async function verifyOtp(token: string, otp: string): Promise<AuthResult> {
@@ -127,7 +111,20 @@ export async function verifyOtp(token: string, otp: string): Promise<AuthResult>
     body: JSON.stringify({ otp }),
   });
 
-  return parseEnvelope<AuthResult>(response);
+  return parseApiEnvelope<AuthResult>(response);
+}
+
+export async function resendOtp(token: string): Promise<OtpChallenge> {
+  const response = await fetch(`${apiConfig.baseUrl}/auth/resend-otp`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  return parseApiEnvelope<OtpChallenge>(response);
 }
 
 export async function getCurrentUser(accessToken: string): Promise<AuthUser> {
@@ -138,7 +135,7 @@ export async function getCurrentUser(accessToken: string): Promise<AuthUser> {
     },
   });
 
-  return parseEnvelope<AuthUser>(response);
+  return parseApiEnvelope<AuthUser>(response);
 }
 
 function getGoogleReturnUrl() {

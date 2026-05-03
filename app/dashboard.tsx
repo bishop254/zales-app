@@ -1,8 +1,11 @@
+import * as Clipboard from 'expo-clipboard';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { Redirect, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   ImageBackground,
@@ -15,28 +18,88 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { imagery, palette, radius, spacing, typography } from '@/constants/app-theme';
-import { bottomNavItems, dashboardShortcuts, recentActivity } from '@/features/dashboard/data';
+import { dashboardShortcuts, recentActivity } from '@/features/dashboard/data';
 import { useAuth } from '@/providers/auth-provider';
+import { useSubscription } from '@/providers/subscription-provider';
+import { useToast } from '@/providers/toast-provider';
 
 export default function DashboardScreen() {
   const { logout, session } = useAuth();
-  const [activeTab, setActiveTab] = useState('tasks');
+  const { showToast } = useToast();
+  const { hasActiveSubscription, subscriptionLoading, reloadSubscription } = useSubscription();
+  const [activeTab, setActiveTab] = useState('home');
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const { width } = useWindowDimensions();
+
+  useFocusEffect(
+    useCallback(() => {
+      reloadSubscription(true);
+    }, [reloadSubscription])
+  );
+
+  const displayName = session?.name?.trim() || session?.email.split('@')[0] || 'Agent';
+  const firstName = session?.firstName?.trim() || displayName.split(' ')[0] || 'Alex';
+  const referralCode = session?.referralCode?.trim() || 'AGENT2024';
+  const shortcutCardWidth = (width - spacing.marginMobile * 2 - spacing.md) / 2;
+  const cardsLocked = subscriptionLoading || !hasActiveSubscription;
 
   if (!session) {
     return <Redirect href="/login" />;
   }
 
-  function handleLogout() {
-    logout();
-    router.replace('/login');
+  if (!subscriptionLoading && !hasActiveSubscription) {
+    return <Redirect href="/billing" />;
   }
 
-  const displayName = session.name?.trim() || session.email.split('@')[0];
-  const firstName = session.firstName?.trim() || displayName.split(' ')[0] || 'Alex';
-  const referralCode = 'AGENT2024';
-  const shortcutCardWidth = (width - spacing.marginMobile * 2 - spacing.md) / 2;
+  function handleLogout() {
+    setMoreMenuOpen(false);
+    logout({ animated: true, redirectToLogin: true });
+  }
+
+  function goToBilling() {
+    setMoreMenuOpen(false);
+    router.push('/billing');
+  }
+
+  function handleBottomNavPress(key: string) {
+    if (key === 'more') {
+      setMoreMenuOpen((current) => !current);
+      return;
+    }
+
+    setMoreMenuOpen(false);
+    if (key === 'covers') {
+      router.push('/covers');
+      return;
+    }
+
+    setActiveTab(key);
+  }
+
+  function handleShortcutPress(item: (typeof dashboardShortcuts)[number]) {
+    if (cardsLocked) {
+      goToBilling();
+      return;
+    }
+
+    if (item.title === 'Insurance' || item.icon === 'shield') {
+      router.push('/covers');
+      return;
+    }
+
+    Alert.alert(item.title, `${item.title} workspace can be wired next.`);
+  }
+
+  async function handleCopyReferralCode() {
+    try {
+      await Clipboard.setStringAsync(referralCode);
+      showToast('Referral code copied.', 'success');
+    } catch {
+      showToast('Unable to copy referral code.', 'error');
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -78,6 +141,7 @@ export default function DashboardScreen() {
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
+          onScrollBeginDrag={() => setMoreMenuOpen(false)}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
           <View style={styles.heroSection}>
@@ -85,35 +149,90 @@ export default function DashboardScreen() {
             <View style={styles.referralPill}>
               <Text style={styles.referralLabel}>Your Referral Code:</Text>
               <Text style={styles.referralValue}>{referralCode}</Text>
-              <Pressable
-                hitSlop={8}
-                onPress={() => Alert.alert('Copied', `${referralCode} copied to clipboard placeholder.`)}>
+              <Pressable hitSlop={8} onPress={handleCopyReferralCode}>
                 <MaterialIcons color="rgba(255,255,255,0.7)" name="content-copy" size={16} />
               </Pressable>
             </View>
           </View>
 
+          {subscriptionLoading ? (
+            <View style={styles.subscriptionBanner}>
+              <ActivityIndicator color={palette.primary} />
+              <View style={styles.subscriptionBannerCopy}>
+                <Text style={styles.subscriptionBannerTitle}>Checking your billing access</Text>
+                <Text style={styles.subscriptionBannerBody}>
+                  We are confirming whether your account has an active subscription.
+                </Text>
+              </View>
+            </View>
+          ) : !hasActiveSubscription ? (
+            <View style={[styles.subscriptionBanner, styles.subscriptionBannerWarning]}>
+              <View style={[styles.subscriptionStatusIcon, styles.subscriptionStatusIconWarning]}>
+                <MaterialIcons color={palette.error} name="warning" size={28} />
+              </View>
+              <View style={styles.subscriptionBannerCopy}>
+                <Text style={styles.subscriptionBannerTitle}>Subscription required</Text>
+                <Text style={styles.subscriptionBannerBody}>
+                  Your workspace modules are locked until you activate a plan from billing.
+                </Text>
+                <Pressable style={styles.subscriptionBannerButton} onPress={goToBilling}>
+                  <Text style={styles.subscriptionBannerButtonText}>Proceed to Billing</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.shortcutsGrid}>
             {dashboardShortcuts.map((item) => (
               <Pressable
                 key={item.title}
-                style={[styles.shortcutCard, { width: shortcutCardWidth }]}
-                onPress={() => Alert.alert(item.title, `${item.title} workspace can be wired next.`)}>
+                style={[
+                  styles.shortcutCard,
+                  { width: shortcutCardWidth },
+                  cardsLocked ? styles.shortcutCardLocked : null,
+                ]}
+                onPress={() => handleShortcutPress(item)}>
                 <View style={styles.shortcutHeader}>
-                  <View style={[styles.shortcutIconWrap, shortcutIconToneStyles[item.iconTone]]}>
-                    <MaterialIcons color={shortcutIconColor[item.iconTone]} name={item.icon} size={28} />
+                  <View
+                    style={[
+                      styles.shortcutIconWrap,
+                      shortcutIconToneStyles[item.iconTone],
+                      cardsLocked ? styles.shortcutIconWrapLocked : null,
+                    ]}>
+                    <MaterialIcons
+                      color={cardsLocked ? '#94A3B8' : shortcutIconColor[item.iconTone]}
+                      name={item.icon}
+                      size={28}
+                    />
                   </View>
-                  <View style={[styles.shortcutBadge, shortcutBadgeToneStyles[item.badgeTone]]}>
-                    <Text style={[styles.shortcutBadgeText, shortcutBadgeTextToneStyles[item.badgeTone]]}>
-                      {item.badge}
+                  <View
+                    style={[
+                      styles.shortcutBadge,
+                      shortcutBadgeToneStyles[item.badgeTone],
+                      cardsLocked ? styles.shortcutBadgeLocked : null,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.shortcutBadgeText,
+                        shortcutBadgeTextToneStyles[item.badgeTone],
+                        cardsLocked ? styles.shortcutBadgeTextLocked : null,
+                      ]}>
+                      {cardsLocked ? 'Locked' : item.badge}
                     </Text>
                   </View>
                 </View>
                 <View>
-                  <Text style={[styles.shortcutEyebrow, shortcutEyebrowToneStyles[item.badgeTone]]}>
-                    {item.eyebrow}
+                  <Text
+                    style={[
+                      styles.shortcutEyebrow,
+                      shortcutEyebrowToneStyles[item.badgeTone],
+                      cardsLocked ? styles.shortcutEyebrowLocked : null,
+                    ]}>
+                    {cardsLocked ? 'Billing Required' : item.eyebrow}
                   </Text>
-                  <Text style={styles.shortcutTitle}>{item.title}</Text>
+                  <Text style={[styles.shortcutTitle, cardsLocked ? styles.shortcutTitleLocked : null]}>
+                    {item.title}
+                  </Text>
                 </View>
               </Pressable>
             ))}
@@ -128,17 +247,24 @@ export default function DashboardScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.activityCard}>
+          <View style={[styles.activityCard, cardsLocked ? styles.activityCardLocked : null]}>
             {recentActivity.map((item, index) => (
               <Pressable
                 key={item.id}
                 style={[styles.activityRow, index < recentActivity.length - 1 ? styles.activityRowBorder : null]}
-                onPress={() => Alert.alert(item.title, item.meta)}>
+                onPress={() => {
+                  if (cardsLocked) {
+                    goToBilling();
+                    return;
+                  }
+
+                  Alert.alert(item.title, item.meta);
+                }}>
                 <View style={[styles.activityIconWrap, activityIconToneStyles[item.type]]}>
                   <MaterialIcons color={activityIconColor[item.type]} name={activityIcons[item.type]} size={24} />
                 </View>
                 <View style={styles.activityCopy}>
-                  <Text style={styles.activityTitle}>{item.title}</Text>
+                  <Text style={[styles.activityTitle, cardsLocked ? styles.dimmedText : null]}>{item.title}</Text>
                   <Text style={styles.activityMeta}>{item.meta}</Text>
                 </View>
                 {item.statusLabel ? (
@@ -161,7 +287,14 @@ export default function DashboardScreen() {
               </Text>
               <Pressable
                 style={styles.promoButton}
-                onPress={() => Alert.alert('Analytics', 'Detailed analytics screen can be wired next.')}>
+                onPress={() => {
+                  if (cardsLocked) {
+                    goToBilling();
+                    return;
+                  }
+
+                  Alert.alert('Analytics', 'Detailed analytics screen can be wired next.');
+                }}>
                 <Text style={styles.promoButtonText}>Check Analytics</Text>
               </Pressable>
             </View>
@@ -169,30 +302,47 @@ export default function DashboardScreen() {
           </View>
         </ScrollView>
 
-        <View style={styles.bottomNav}>
-          {bottomNavItems.map((item) => {
-            const active = item.key === activeTab;
-
-            return (
+        {moreMenuOpen ? (
+          <>
+            <Pressable style={styles.moreMenuBackdrop} onPress={() => setMoreMenuOpen(false)} />
+            <View style={styles.moreMenu}>
               <Pressable
-                key={item.key}
-                style={[styles.bottomNavItem, active ? styles.bottomNavItemActive : null]}
+                style={styles.moreMenuItem}
                 onPress={() => {
-                  if (item.key === 'more') {
-                    handleLogout();
-                    return;
-                  }
-
-                  setActiveTab(item.key);
+                  setMoreMenuOpen(false);
+                  Alert.alert('Support', 'Support workspace can be connected next.');
                 }}>
-                <MaterialIcons color={active ? palette.primary : '#94A3B8'} name={item.icon} size={22} />
-                <Text style={[styles.bottomNavLabel, active ? styles.bottomNavLabelActive : null]}>
-                  {item.label}
-                </Text>
+                <View style={styles.moreMenuIconWrap}>
+                  <MaterialIcons color={palette.primary} name="contact-support" size={20} />
+                </View>
+                <View style={styles.moreMenuCopy}>
+                  <Text style={styles.moreMenuTitle}>Support</Text>
+                  <Text style={styles.moreMenuSubtitle}>Open support tools and tickets</Text>
+                </View>
               </Pressable>
-            );
-          })}
-        </View>
+              <Pressable style={styles.moreMenuItem} onPress={goToBilling}>
+                <View style={styles.moreMenuIconWrap}>
+                  <MaterialIcons color={palette.primary} name="verified-user" size={20} />
+                </View>
+                <View style={styles.moreMenuCopy}>
+                  <Text style={styles.moreMenuTitle}>Billing</Text>
+                  <Text style={styles.moreMenuSubtitle}>Manage subscription and payments</Text>
+                </View>
+              </Pressable>
+              <Pressable style={styles.moreMenuItem} onPress={handleLogout}>
+                <View style={[styles.moreMenuIconWrap, styles.moreMenuIconWrapMuted]}>
+                  <MaterialIcons color={palette.onSurface} name="logout" size={20} />
+                </View>
+                <View style={styles.moreMenuCopy}>
+                  <Text style={styles.moreMenuTitle}>Logout</Text>
+                  <Text style={styles.moreMenuSubtitle}>Sign out of your account</Text>
+                </View>
+              </Pressable>
+            </View>
+          </>
+        ) : null}
+
+        <FloatingBottomNav activeKey={moreMenuOpen ? 'more' : activeTab} onPress={handleBottomNavPress} />
       </View>
     </SafeAreaView>
   );
@@ -210,6 +360,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.12,
     shadowRadius: 24,
+  },
+  activityCardLocked: {
+    opacity: 0.72,
   },
   activityCopy: {
     flex: 1,
@@ -271,50 +424,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 51, 102, 0.22)',
   },
-  bottomNav: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.98)',
-    borderColor: 'rgba(0,92,171,0.08)',
-    borderRadius: 24,
-    borderWidth: 1,
-    bottom: 0,
-    elevation: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    minHeight: 68,
-    marginBottom: 16,
-    paddingBottom: 10,
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    position: 'absolute',
-    width: '84%',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.24,
-    shadowRadius: 32,
-  },
-  bottomNavItem: {
-    alignItems: 'center',
-    borderRadius: radius.lg,
-    justifyContent: 'center',
-    minWidth: 52,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  bottomNavItemActive: {
-    backgroundColor: 'rgba(0, 92, 171, 0.08)',
-  },
-  bottomNavLabel: {
-    color: '#64748B',
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 1,
-  },
-  bottomNavLabelActive: {
-    color: palette.primary,
-    fontWeight: '700',
-  },
   brandBadge: {
     alignItems: 'center',
     backgroundColor: palette.primary,
@@ -329,9 +438,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.2,
   },
+  dimmedText: {
+    color: '#5B6471',
+  },
   heroSection: {
     gap: spacing.sm,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
     paddingHorizontal: spacing.marginMobile,
     paddingTop: spacing.lg,
   },
@@ -414,6 +526,59 @@ const styles = StyleSheet.create({
     fontSize: typography.label,
     fontWeight: '700',
   },
+  moreMenu: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderColor: 'rgba(0,92,171,0.08)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    bottom: 94,
+    padding: spacing.sm,
+    position: 'absolute',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    width: '72%',
+    zIndex: 40,
+  },
+  moreMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    zIndex: 30,
+  },
+  moreMenuCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  moreMenuIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 92, 171, 0.1)',
+    borderRadius: radius.pill,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  moreMenuIconWrapMuted: {
+    backgroundColor: 'rgba(224, 227, 229, 0.85)',
+  },
+  moreMenuItem: {
+    alignItems: 'center',
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  moreMenuSubtitle: {
+    color: palette.onSurfaceVariant,
+    fontSize: 12,
+  },
+  moreMenuTitle: {
+    color: palette.onSurface,
+    fontSize: typography.bodySmall,
+    fontWeight: '700',
+  },
   safeArea: {
     backgroundColor: palette.deepNavy,
     flex: 1,
@@ -422,7 +587,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 64,
+    paddingTop: 92,
   },
   sectionButton: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -454,9 +619,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
+  shortcutBadgeLocked: {
+    backgroundColor: '#E2E8F0',
+    borderColor: '#CBD5E1',
+  },
   shortcutBadgeText: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  shortcutBadgeTextLocked: {
+    color: '#64748B',
   },
   shortcutCard: {
     backgroundColor: palette.surfaceContainerLowest,
@@ -473,12 +645,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 24,
   },
+  shortcutCardLocked: {
+    backgroundColor: '#E5E7EB',
+    borderColor: '#CBD5E1',
+  },
   shortcutEyebrow: {
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.2,
     marginBottom: 4,
     textTransform: 'uppercase',
+  },
+  shortcutEyebrowLocked: {
+    color: '#64748B',
   },
   shortcutHeader: {
     alignItems: 'flex-start',
@@ -492,16 +671,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 48,
   },
+  shortcutIconWrapLocked: {
+    backgroundColor: '#CBD5E1',
+  },
   shortcutTitle: {
     color: palette.onSurface,
     fontSize: 20,
     fontWeight: '600',
   },
+  shortcutTitleLocked: {
+    color: '#475569',
+  },
   shortcutsGrid: {
     columnGap: spacing.md,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: -16,
+    marginTop: -4,
     paddingHorizontal: spacing.marginMobile,
     rowGap: spacing.md,
   },
@@ -519,24 +704,86 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
+  subscriptionBanner: {
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderColor: 'rgba(255,255,255,0.4)',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginHorizontal: spacing.marginMobile,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 30,
+  },
+  subscriptionBannerActive: {
+    backgroundColor: 'rgba(255,255,255,0.98)',
+  },
+  subscriptionBannerBody: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+  },
+  subscriptionBannerButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: palette.primary,
+    borderRadius: radius.pill,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+  },
+  subscriptionBannerButtonText: {
+    color: palette.onPrimary,
+    fontSize: typography.label,
+    fontWeight: '700',
+  },
+  subscriptionBannerCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  subscriptionBannerTitle: {
+    color: palette.onSurface,
+    fontSize: typography.title,
+    fontWeight: '700',
+  },
+  subscriptionBannerWarning: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  subscriptionStatusIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 92, 171, 0.1)',
+    borderRadius: radius.xl,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  subscriptionStatusIconWarning: {
+    backgroundColor: 'rgba(186, 26, 26, 0.1)',
+  },
   topBar: {
     alignItems: 'center',
-    backgroundColor: palette.white,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
-    borderBottomWidth: 1,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderColor: 'rgba(0,92,171,0.08)',
+    borderRadius: 24,
+    borderWidth: 1,
     elevation: 6,
     flexDirection: 'row',
     height: 64,
     justifyContent: 'space-between',
-    left: 0,
-    paddingHorizontal: 20,
+    marginTop: 8,
+    paddingHorizontal: 18,
     position: 'absolute',
-    right: 0,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
     top: 0,
+    width: '90%',
     zIndex: 20,
   },
   topBarActions: {
