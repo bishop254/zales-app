@@ -22,3 +22,19 @@ export async function parseApiEnvelope<T>(response: Response): Promise<T> {
 
   return payload.data;
 }
+
+export async function parseApiEnvelopeNullable<T>(response: Response): Promise<T | null> {
+  const payload = (await response.json()) as ApiEnvelope<T>;
+
+  if (response.status === 401 || payload.status_code === 401) {
+    const message = payload.message || 'Your session has expired. Please sign in again.';
+    notifyUnauthorized(message);
+    throw new UnauthorizedError(message);
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.message || 'Request failed.');
+  }
+
+  return payload.data ?? null;
+}
