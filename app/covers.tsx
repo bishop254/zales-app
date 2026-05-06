@@ -6,8 +6,10 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   type ViewStyle,
   useWindowDimensions,
   View,
@@ -19,7 +21,7 @@ import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { AuthTextField } from '@/components/auth/auth-primitives';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
-import { type CoverRecord, createCover, deleteCover, getCoverById, getCovers, updateCover } from '@/features/covers/covers-api';
+import { type CoverRecord, type PaymentTimelineItem, createCover, deleteCover, getCoverById, getCovers, getPaymentTimeline, markCyclePaid, markExpiryComplete, updateCover } from '@/features/covers/covers-api';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
 import { useToast } from '@/providers/toast-provider';
@@ -39,9 +41,11 @@ const iconToneColors = {
 };
 
 type CoverStatus = 'ACTIVE' | 'DUE' | 'LAPSED';
+type CoverFilter = 'ALL' | CoverStatus;
 
 type CoverSummaryCard = {
   count: string;
+  filter: CoverFilter;
   icon: keyof typeof MaterialIcons.glyphMap;
   iconTone: 'primary' | 'secondary' | 'tertiary' | 'neutral';
   label: string;
@@ -180,26 +184,51 @@ function daysUntil(dateValue: string | null) {
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
+function isMonthlyCover(cover: CoverRecord) {
+  return cover.cycle === 'MONTHLY';
+}
+
+function getCoverTrackingDate(cover: CoverRecord) {
+  return isMonthlyCover(cover) ? cover.nextDueDate ?? cover.expiryDate : cover.expiryDate;
+}
+
+function sortBySoonestDate<T>(items: T[], getDate: (item: T) => string | null) {
+  return [...items].sort((left, right) => daysUntil(getDate(left)) - daysUntil(getDate(right)));
+}
+
 function getCoverStatus(cover: CoverRecord): CoverStatus {
   if (daysUntil(cover.expiryDate) < 0) {
     return 'LAPSED';
   }
 
-  const targetDate = cover.cycle === 'MONTHLY' ? cover.nextDueDate ?? cover.expiryDate : cover.expiryDate;
-  return daysUntil(targetDate) <= 7 ? 'DUE' : 'ACTIVE';
+  return daysUntil(getCoverTrackingDate(cover)) <= 7 ? 'DUE' : 'ACTIVE';
 }
 
 function mapCoverToListItem(cover: CoverRecord): CoverListItem {
-  const targetDate = cover.cycle === 'MONTHLY' ? cover.nextDueDate ?? cover.expiryDate : cover.expiryDate;
-
   return {
-    dueDate: formatLongDate(targetDate),
+    dueDate: formatLongDate(getCoverTrackingDate(cover)),
     id: cover.id,
     provider: cover.insuranceProvider,
     status: getCoverStatus(cover),
     title: cover.customerIdentifier,
     type: cover.insuranceProduct,
   };
+}
+
+function buildCoverSearchValue(cover: CoverRecord, listItem: CoverListItem) {
+  return [
+    cover.customerIdentifier,
+    cover.insuranceProvider,
+    cover.insuranceProduct,
+    cover.policyNumber ?? '',
+    cover.vehicleReg ?? '',
+    cover.currency,
+    cover.cycle,
+    listItem.dueDate,
+    listItem.status,
+  ]
+    .join(' ')
+    .toLowerCase();
 }
 
 function buildSummaryCards(covers: CoverRecord[]): CoverSummaryCard[] {
@@ -216,6 +245,7 @@ function buildSummaryCards(covers: CoverRecord[]): CoverSummaryCard[] {
   return [
     {
       count: String(counts.total),
+      filter: 'ALL',
       icon: 'shield',
       iconTone: 'primary',
       label: 'All Policies',
@@ -223,6 +253,7 @@ function buildSummaryCards(covers: CoverRecord[]): CoverSummaryCard[] {
     },
     {
       count: String(counts.ACTIVE),
+      filter: 'ACTIVE',
       icon: 'verified-user',
       iconTone: 'secondary',
       label: 'Protected',
@@ -230,6 +261,7 @@ function buildSummaryCards(covers: CoverRecord[]): CoverSummaryCard[] {
     },
     {
       count: String(counts.DUE),
+      filter: 'DUE',
       icon: 'event',
       iconTone: 'tertiary',
       label: 'Renewals',
@@ -237,6 +269,7 @@ function buildSummaryCards(covers: CoverRecord[]): CoverSummaryCard[] {
     },
     {
       count: String(counts.LAPSED),
+      filter: 'LAPSED',
       icon: 'gpp-bad',
       iconTone: 'neutral',
       label: 'Needs Attention',
@@ -296,6 +329,8 @@ export default function CoversScreen() {
   const { showToast } = useToast();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [covers, setCovers] = useState<CoverRecord[]>([]);
+  const [coverSearch, setCoverSearch] = useState('');
+  const [coverFilter, setCoverFilter] = useState<CoverFilter>('ALL');
   const [coverForm, setCoverForm] = useState<CreateCoverForm>(INITIAL_FORM);
   const [coverTouched, setCoverTouched] = useState<CreateCoverTouched>(INITIAL_TOUCHED);
   const [coversLoading, setCoversLoading] = useState(false);
@@ -310,6 +345,11 @@ export default function CoversScreen() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [coverDetailLoading, setCoverDetailLoading] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
+  const [markingExpiryCompleteId, setMarkingExpiryCompleteId] = useState<string | null>(null);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [timeline, setTimeline] = useState<PaymentTimelineItem[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
   const [selectedCoverId, setSelectedCoverId] = useState<string | null>(null);
   const [selectedCoverDetail, setSelectedCoverDetail] = useState<CoverRecord | null>(null);
   const [pickerMonth, setPickerMonth] = useState(() => {
@@ -320,31 +360,58 @@ export default function CoversScreen() {
   const avatarLetter = ((session?.name?.trim() || session?.email || '?').slice(0, 1)).toUpperCase();
   const cardWidth = (width - spacing.marginMobile * 2 - spacing.md) / 2;
   const listItems = useMemo(() => covers.map(mapCoverToListItem), [covers]);
+  const filteredListItems = useMemo(() => {
+    const query = coverSearch.trim().toLowerCase();
+    return covers
+      .map((cover, index) => {
+        const listItem = listItems[index];
+        if (!listItem) {
+          return null;
+        }
+
+        if (coverFilter !== 'ALL' && listItem.status !== coverFilter) {
+          return null;
+        }
+
+        if (query && !buildCoverSearchValue(cover, listItem).includes(query)) {
+          return null;
+        }
+
+        return listItem;
+      })
+      .filter((item): item is CoverListItem => item !== null);
+  }, [coverFilter, coverSearch, covers, listItems]);
   const coverSummaryCards = useMemo(() => buildSummaryCards(covers), [covers]);
   const dueSoonCount = useMemo(() => covers.filter((cover) => getCoverStatus(cover) === 'DUE').length, [covers]);
   const cycleDueNotifications = useMemo(
     () =>
-      covers
-        .filter((cover) => {
-          if (cover.cycle !== 'MONTHLY' || !cover.nextDueDate) {
+      sortBySoonestDate(
+        covers.filter((cover) => {
+          if (!isMonthlyCover(cover) || !cover.nextDueDate) {
             return false;
           }
 
           const days = daysUntil(cover.nextDueDate);
           return days >= 0 && days <= MONTHLY_DUE_NOTICE_DAYS;
-        })
-        .sort((left, right) => daysUntil(left.nextDueDate) - daysUntil(right.nextDueDate))
+        }),
+        (cover) => cover.nextDueDate,
+      )
         .map((cover) => buildCoverNotificationItem(cover, cover.nextDueDate as string, 'cycle')),
     [covers]
   );
   const expiryNotifications = useMemo(
     () =>
-      covers
-        .filter((cover) => {
+      sortBySoonestDate(
+        covers.filter((cover) => {
+          if (isMonthlyCover(cover)) {
+            return false;
+          }
+
           const days = daysUntil(cover.expiryDate);
           return days >= 0 && days <= EXPIRY_NOTICE_DAYS;
-        })
-        .sort((left, right) => daysUntil(left.expiryDate) - daysUntil(right.expiryDate))
+        }),
+        (cover) => cover.expiryDate,
+      )
         .map((cover) => buildCoverNotificationItem(cover, cover.expiryDate, 'expiry')),
     [covers]
   );
@@ -633,6 +700,68 @@ export default function CoversScreen() {
     }
   }
 
+  async function handleViewTimeline() {
+    if (!selectedCoverId || !session?.accessToken) {
+      return;
+    }
+
+    setCoverActionMenuOpen(false);
+    setTimelineLoading(true);
+    setTimelineOpen(true);
+
+    try {
+      const items = await getPaymentTimeline(session.accessToken, selectedCoverId);
+      setTimeline(items);
+    } catch (error) {
+      if (!(error instanceof UnauthorizedError)) {
+        showToast(error instanceof Error ? error.message : 'Unable to load payment timeline.', 'error');
+      }
+      setTimelineOpen(false);
+    } finally {
+      setTimelineLoading(false);
+    }
+  }
+
+  async function handleMarkCyclePaid(coverId: string) {
+    if (!session?.accessToken || markingPaidId) {
+      return;
+    }
+
+    setMarkingPaidId(coverId);
+
+    try {
+      await markCyclePaid(session.accessToken, coverId);
+      showToast('Cycle marked as paid.');
+      await loadCovers({ silent: true });
+    } catch (error) {
+      if (!(error instanceof UnauthorizedError)) {
+        showToast(error instanceof Error ? error.message : 'Unable to mark cycle as paid.', 'error');
+      }
+    } finally {
+      setMarkingPaidId(null);
+    }
+  }
+
+  async function handleMarkExpiryComplete(coverId: string) {
+    if (!session?.accessToken || markingExpiryCompleteId) {
+      return;
+    }
+
+    setMarkingExpiryCompleteId(coverId);
+
+    try {
+      await markExpiryComplete(session.accessToken, coverId);
+      showToast('Cover expiry marked as complete.');
+      await loadCovers({ silent: true });
+    } catch (error) {
+      if (!(error instanceof UnauthorizedError)) {
+        showToast(error instanceof Error ? error.message : 'Unable to complete cover expiry.', 'error');
+      }
+    } finally {
+      setMarkingExpiryCompleteId(null);
+    }
+  }
+
   return (
     <>
       <FloatingPageShell
@@ -642,6 +771,12 @@ export default function CoversScreen() {
         onNotificationPress={() => setNotificationsOpen(true)}
         onProfilePress={() => Alert.alert('Account', `Signed in as ${session.email}`)}
         profileImageUrl={session.profileImageUrl}
+        refreshControl={
+          <RefreshControl
+            refreshing={coversLoading}
+            onRefresh={() => loadCovers()}
+          />
+        }
         scrollViewProps={{ onScrollBeginDrag: () => setMoreMenuOpen(false) }}
         title="Covers">
         <View style={styles.heroSection}>
@@ -663,8 +798,12 @@ export default function CoversScreen() {
           {coverSummaryCards.map((card) => (
             <Pressable
               key={card.title}
-              style={[styles.summaryCard, { width: cardWidth }]}
-              onPress={() => Alert.alert(card.title, `${card.title} covers detail can be connected next.`)}>
+              style={[
+                styles.summaryCard,
+                { width: cardWidth },
+                coverFilter === card.filter ? styles.summaryCardActive : null,
+              ]}
+              onPress={() => setCoverFilter(card.filter)}>
               <View style={styles.summaryHeader}>
                 <View style={[styles.summaryIconWrap, iconToneStyles[card.iconTone]]}>
                   <MaterialIcons color={iconToneColors[card.iconTone]} name={card.icon} size={26} />
@@ -680,14 +819,33 @@ export default function CoversScreen() {
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionLabel}>Covers List</Text>
-            <Text style={styles.sectionCount}>{listItems.length} records</Text>
+            <Text style={styles.sectionCount}>
+              {filteredListItems.length} {coverFilter === 'ALL' ? 'records' : `${coverFilter.toLowerCase()} records`}
+            </Text>
+          </View>
+          <View style={styles.searchBar}>
+            <MaterialIcons color={palette.onSurfaceVariant} name="search" size={18} />
+            <TextInput
+              placeholder="Search customer, provider, product, policy..."
+              placeholderTextColor={palette.onSurfaceVariant}
+              returnKeyType="search"
+              selectionColor={palette.primary}
+              style={styles.searchInput}
+              value={coverSearch}
+              onChangeText={setCoverSearch}
+            />
+            {coverSearch.trim() ? (
+              <Pressable hitSlop={8} onPress={() => setCoverSearch('')}>
+                <MaterialIcons color={palette.onSurfaceVariant} name="close" size={18} />
+              </Pressable>
+            ) : null}
           </View>
           <View style={styles.listCard}>
-            {listItems.length ? (
-              listItems.map((cover, index) => (
+            {filteredListItems.length ? (
+              filteredListItems.map((cover, index) => (
                 <Pressable
                   key={cover.id}
-                  style={[styles.coverRow, index < listItems.length - 1 ? styles.coverRowBorder : null]}
+                  style={[styles.coverRow, index < filteredListItems.length - 1 ? styles.coverRowBorder : null]}
                   onPress={() => handleCoverPress(cover.id)}>
                   <View style={styles.coverRowLeft}>
                     <View
@@ -728,6 +886,12 @@ export default function CoversScreen() {
               <View style={styles.emptyState}>
                 <ActivityIndicator color={palette.primary} size="small" />
                 <Text style={styles.emptyStateTitle}>Loading covers...</Text>
+              </View>
+            ) : covers.length ? (
+              <View style={styles.emptyState}>
+                <MaterialIcons color={palette.outline} name="search-off" size={28} />
+                <Text style={styles.emptyStateTitle}>No matching covers</Text>
+                <Text style={styles.emptyStateBody}>Try a different customer name, provider, product, or policy number.</Text>
               </View>
             ) : (
               <View style={styles.emptyState}>
@@ -770,6 +934,15 @@ export default function CoversScreen() {
             <View style={styles.actionMenuCopy}>
               <Text style={styles.actionMenuTitle}>View</Text>
               <Text style={styles.actionMenuBody}>Open full cover details</Text>
+            </View>
+          </Pressable>
+          <Pressable style={styles.actionMenuItem} onPress={handleViewTimeline}>
+            <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
+              <MaterialIcons color={palette.primary} name="history" size={18} />
+            </View>
+            <View style={styles.actionMenuCopy}>
+              <Text style={styles.actionMenuTitle}>Timeline</Text>
+              <Text style={styles.actionMenuBody}>View payment history</Text>
             </View>
           </Pressable>
           <Pressable style={styles.actionMenuItem} onPress={handleEditCover}>
@@ -850,6 +1023,50 @@ export default function CoversScreen() {
         ) : (
           <View style={styles.modalLoadingState}>
             <Text style={styles.modalLoadingText}>No cover details available.</Text>
+          </View>
+        )}
+      </AppModal>
+
+      <AppModal
+        footer={
+          <Pressable style={styles.modalButton} onPress={() => setTimelineOpen(false)}>
+            <Text style={styles.modalButtonText}>Close</Text>
+          </Pressable>
+        }
+        frameStyle={styles.viewModalFrame}
+        title="Payment timeline"
+        visible={timelineOpen}
+        onClose={() => setTimelineOpen(false)}>
+        {timelineLoading ? (
+          <View style={styles.modalLoadingState}>
+            <ActivityIndicator color={palette.primary} size="small" />
+            <Text style={styles.modalLoadingText}>Loading timeline...</Text>
+          </View>
+        ) : timeline.length ? (
+          <View style={styles.notificationList}>
+            {timeline.map((item, index) => (
+              <View
+                key={`${item.dueDate}-${index}`}
+                style={[styles.notificationRow, index < timeline.length - 1 ? styles.notificationRowBorder : null]}>
+                <View style={[styles.notificationIconWrap, styles.notificationIconWrapPrimary]}>
+                  <MaterialIcons color={palette.primary} name="payments" size={18} />
+                </View>
+                <View style={styles.notificationCopy}>
+                  <Text style={styles.notificationTitle}>
+                    {item.currency} {Number(item.amount).toLocaleString()}
+                  </Text>
+                  <Text style={styles.notificationMeta}>Due: {formatLongDate(item.dueDate)} • {item.cycle}</Text>
+                  <Text style={styles.notificationBody}>
+                    Paid: {new Date(item.paidAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.modalLoadingState}>
+            <MaterialIcons color={palette.outline} name="history" size={28} />
+            <Text style={styles.modalLoadingText}>No payment history yet.</Text>
           </View>
         )}
       </AppModal>
@@ -1088,6 +1305,17 @@ export default function CoversScreen() {
                     <Text style={styles.notificationMeta}>{item.provider} • {item.type}</Text>
                     <Text style={styles.notificationBody}>{item.daysLabel} • {item.dateLabel}</Text>
                   </View>
+                  <Pressable
+                    disabled={markingPaidId === item.id}
+                    hitSlop={8}
+                    style={[styles.markPaidButton, markingPaidId === item.id ? styles.markPaidButtonDisabled : null]}
+                    onPress={() => handleMarkCyclePaid(item.id)}>
+                    {markingPaidId === item.id ? (
+                      <ActivityIndicator color={palette.primary} size="small" />
+                    ) : (
+                      <MaterialIcons color={palette.primary} name="check-circle-outline" size={24} />
+                    )}
+                  </Pressable>
                 </View>
               ))}
             </View>
@@ -1114,6 +1342,17 @@ export default function CoversScreen() {
                     <Text style={styles.notificationMeta}>{item.provider} • {item.type}</Text>
                     <Text style={styles.notificationBody}>{item.daysLabel} • {item.dateLabel}</Text>
                   </View>
+                  <Pressable
+                    disabled={markingExpiryCompleteId === item.id}
+                    hitSlop={8}
+                    style={[styles.markPaidButton, markingExpiryCompleteId === item.id ? styles.markPaidButtonDisabled : null]}
+                    onPress={() => handleMarkExpiryComplete(item.id)}>
+                    {markingExpiryCompleteId === item.id ? (
+                      <ActivityIndicator color={palette.tertiary} size="small" />
+                    ) : (
+                      <MaterialIcons color={palette.tertiary} name="check-circle-outline" size={24} />
+                    )}
+                  </Pressable>
                 </View>
               ))}
             </View>
@@ -1202,25 +1441,31 @@ export default function CoversScreen() {
           {buildCalendarDays(pickerMonth).map((day, index) => {
             const iso = day ? formatDateIso(day) : null;
             const selected = iso === coverForm.expiryDate;
+            const tomorrow = new Date();
+            tomorrow.setHours(0, 0, 0, 0);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const isPast = day ? day < tomorrow : false;
+            const isDisabled = !day || isPast;
 
             return (
               <Pressable
                 key={iso ?? `empty-${index}`}
-                disabled={!day}
+                disabled={isDisabled}
                 style={[
                   styles.calendarDay,
                   !day ? styles.calendarDayEmpty : null,
+                  isPast ? styles.calendarDayPast : null,
                   selected ? styles.calendarDaySelected : null,
                 ]}
                 onPress={() => {
-                  if (!day) return;
-                  updateForm('expiryDate', formatDateIso(day));
+                  updateForm('expiryDate', formatDateIso(day!));
                   setDatePickerOpen(false);
                 }}>
                 <Text
                   style={[
                     styles.calendarDayText,
                     !day ? styles.calendarDayTextEmpty : null,
+                    isPast ? styles.calendarDayTextPast : null,
                     selected ? styles.calendarDayTextSelected : null,
                   ]}>
                   {day ? day.getDate() : ''}
@@ -1563,6 +1808,9 @@ const styles = StyleSheet.create({
   calendarDayEmpty: {
     opacity: 0,
   },
+  calendarDayPast: {
+    opacity: 0.3,
+  },
   calendarDaySelected: {
     backgroundColor: palette.primary,
   },
@@ -1573,6 +1821,9 @@ const styles = StyleSheet.create({
   },
   calendarDayTextEmpty: {
     color: 'transparent',
+  },
+  calendarDayTextPast: {
+    color: palette.onSurfaceVariant,
   },
   calendarDayTextSelected: {
     color: palette.onPrimary,
@@ -1649,6 +1900,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.12,
     shadowRadius: 24,
+  },
+  searchBar: {
+    alignItems: 'center',
+    backgroundColor: palette.surfaceContainerLowest,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  searchInput: {
+    color: palette.onSurface,
+    flex: 1,
+    fontSize: typography.body,
+    paddingVertical: spacing.xs,
   },
   modalButton: {
     alignItems: 'center',
@@ -1915,6 +2184,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 24,
   },
+  summaryCardActive: {
+    borderColor: palette.primary,
+    borderWidth: 2,
+  },
   summaryCount: {
     color: palette.onSurface,
     fontSize: 20,
@@ -1996,5 +2269,15 @@ const styles = StyleSheet.create({
     color: palette.onSurface,
     fontSize: typography.bodySmall,
     fontWeight: '700',
+  },
+  markPaidButton: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  markPaidButtonDisabled: {
+    opacity: 0.5,
   },
 });

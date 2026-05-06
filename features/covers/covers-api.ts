@@ -104,6 +104,43 @@ export async function updateCover(
   return parseApiEnvelope<CoverRecord>(response);
 }
 
+export type PaymentTimelineItem = {
+  amount: number;
+  currency: string;
+  cycle: string;
+  dueDate: string;
+  paidAt: string;
+};
+
+export async function getPaymentTimeline(accessToken: string, coverId: string): Promise<PaymentTimelineItem[]> {
+  const response = await fetch(`${apiConfig.baseUrl}/covers/${coverId}/payment-timeline`, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return parseApiEnvelope<PaymentTimelineItem[]>(response);
+}
+
+export async function markCyclePaid(accessToken: string, coverId: string): Promise<CoverRecord> {
+  const response = await fetch(`${apiConfig.baseUrl}/covers/${coverId}/mark-cycle-paid`, {
+    headers: authHeaders(accessToken),
+    method: 'POST',
+  });
+
+  return parseApiEnvelope<CoverRecord>(response);
+}
+
+export async function markExpiryComplete(accessToken: string, coverId: string): Promise<CoverRecord> {
+  const response = await fetch(`${apiConfig.baseUrl}/covers/${coverId}/mark-expiry-complete`, {
+    headers: authHeaders(accessToken),
+    method: 'POST',
+  });
+
+  return parseApiEnvelope<CoverRecord>(response);
+}
+
 export async function deleteCover(accessToken: string, coverId: string): Promise<void> {
   const response = await fetch(`${apiConfig.baseUrl}/covers/${coverId}`, {
     headers: {
