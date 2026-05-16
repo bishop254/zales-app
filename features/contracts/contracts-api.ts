@@ -18,8 +18,20 @@ export type ContractRecord = {
   deletedAt: string | null;
   description: string | null;
   id: string;
+  notificationsSent: {
+    annualDue: boolean;
+    expiryDays: number[];
+  } | null;
+  renewalTimeline?: ContractRenewalTimelineItem[];
+  renewedAt: string | null;
   updatedAt: string;
   userId: string;
+};
+
+export type ContractRenewalTimelineItem = {
+  endDate: string;
+  renewedAt: string;
+  startDate: string;
 };
 
 export type CreateContractPayload = {
@@ -34,6 +46,10 @@ export type CreateContractPayload = {
 
 export type UpdateContractPayload = Partial<Omit<CreateContractPayload, 'contractFile'>> & {
   contractFile?: DocumentPickerAsset | null;
+};
+
+export type MarkContractExpiryCompletePayload = {
+  contractExpiryDate: string;
 };
 
 function authHeaders(accessToken: string) {
@@ -157,6 +173,31 @@ export async function updateContract(
   });
 
   return parseApiEnvelope<ContractRecord>(response);
+}
+
+export async function markContractExpiryComplete(
+  accessToken: string,
+  contractId: string,
+  payload: MarkContractExpiryCompletePayload
+): Promise<ContractRecord> {
+  const response = await fetch(`${apiConfig.baseUrl}/contracts/${contractId}/mark-expiry-complete`, {
+    body: JSON.stringify(payload),
+    headers: jsonHeaders(accessToken),
+    method: 'POST',
+  });
+
+  return parseApiEnvelope<ContractRecord>(response);
+}
+
+export async function getContractRenewalTimeline(
+  accessToken: string,
+  contractId: string
+): Promise<ContractRenewalTimelineItem[]> {
+  const response = await fetch(`${apiConfig.baseUrl}/contracts/${contractId}/renewal-timeline`, {
+    headers: authHeaders(accessToken),
+  });
+
+  return parseApiEnvelope<ContractRenewalTimelineItem[]>(response);
 }
 
 export async function deleteContract(accessToken: string, contractId: string): Promise<void> {

@@ -41,7 +41,7 @@ type DateFieldKey = 'contractStartDate' | 'contractExpiryDate';
 
 type ExistingFileState = {
   name: string;
-  url: string;
+  url: string | null;
 } | null;
 
 type InfoModalState = {
@@ -220,7 +220,7 @@ export default function ContractFormScreen() {
           description: contract.description ?? '',
         });
         setExistingFile(
-          contract.contractFileName && contract.contractFileUrl
+          contract.contractFileName
             ? { name: contract.contractFileName, url: contract.contractFileUrl }
             : null
         );
@@ -498,7 +498,9 @@ export default function ContractFormScreen() {
                         {selectedFile
                           ? `${formatFileSize(selectedFile.size)} selected for upload`
                           : existingFile
-                            ? 'Saved contract file available to open'
+                            ? existingFile.url
+                              ? 'Saved contract file available to open'
+                              : 'Saved contract file attached to this record'
                             : 'Attach a PDF, image, or supporting document if needed.'}
                       </Text>
                     </View>
@@ -521,7 +523,7 @@ export default function ContractFormScreen() {
                         </Text>
                       </Pressable>
                     ) : null}
-                    {!selectedFile && existingFile ? (
+                    {!selectedFile && existingFile?.url ? (
                       <Pressable
                         style={[styles.inlineActionButton, styles.inlineActionButtonMuted]}
                         onPress={handleOpenExistingFile}>

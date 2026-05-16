@@ -1,10 +1,15 @@
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { MaterialIcons } from '@expo/vector-icons';
+import { File, Paths } from 'expo-file-system';
+import { getContentUriAsync } from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useFocusEffect } from '@react-navigation/native';
 import { Redirect, router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -20,13 +25,19 @@ import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AppModal } from '@/components/app/app-modal';
 import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
+import { AuthTextField } from '@/components/auth/auth-primitives';
+import { apiConfig } from '@/constants/api';
 import { SummaryCard, type SummaryCardTone } from '@/components/dashboard/summary-card';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
   type ContractRecord,
   deleteContract,
+  getContractById,
+  getContractRenewalTimeline,
   getContracts,
+  markContractExpiryComplete,
+  type ContractRenewalTimelineItem,
 } from '@/features/contracts/contracts-api';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
@@ -52,10 +63,24 @@ type ContractListItem = {
   title: string;
 };
 
+type ContractNotificationItem = {
+  dateLabel: string;
+  daysLabel: string;
+  id: string;
+  parties: string;
+  title: string;
+};
+
 type InfoModalState = {
   eyebrow: string;
   message: string;
   title: string;
+  visible: boolean;
+};
+
+type NotificationConfirmState = {
+  contractId: string | null;
+  expiryDate: string;
   visible: boolean;
 };
 
@@ -83,6 +108,52 @@ function formatLongDate(dateValue: string | null) {
   }).format(parsed);
 }
 
+function formatReadableDate(dateValue: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue.trim())) {
+    return dateValue;
+  }
+
+  const parsed = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return dateValue;
+  }
+
+  return parsed.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function formatDateIso(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildCalendarDays(monthDate: Date) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (Date | null)[] = [];
+
+  for (let index = 0; index < firstDay; index += 1) {
+    cells.push(null);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push(new Date(year, month, day));
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push(null);
+  }
+
+  return cells;
+}
+
 function formatFileSize(size?: number | null) {
   if (!size || size <= 0) return 'Unknown size';
   if (size < 1024) return `${size} B`;
@@ -102,6 +173,39 @@ function daysUntil(dateValue: string | null) {
   target.setHours(0, 0, 0, 0);
 
   return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
+function isIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return false;
+  }
+
+  return !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
+}
+
+function advanceContractExpiryDate(currentExpiryDate: string) {
+  const date = new Date(`${currentExpiryDate}T00:00:00`);
+  const dayOfMonth = date.getDate();
+  const next = new Date(date.getFullYear() + 1, date.getMonth(), dayOfMonth);
+  return next.toISOString().split('T')[0];
+}
+
+function getExpiryCompletionError(contract: ContractRecord | null, expiryDate: string) {
+  const trimmed = expiryDate.trim();
+
+  if (!trimmed) {
+    return 'Enter the new expiry date.';
+  }
+
+  if (!isIsoDate(trimmed)) {
+    return 'Use the YYYY-MM-DD format for the new expiry date.';
+  }
+
+  if (contract && new Date(`${trimmed}T00:00:00`) < new Date(`${contract.contractStartDate}T00:00:00`)) {
+    return 'New expiry date cannot be earlier than the contract start date.';
+  }
+
+  return null;
 }
 
 function getContractStatus(contract: ContractRecord): ContractStatus {
@@ -190,6 +294,67 @@ function buildSummaryCards(contracts: ContractRecord[]): ContractSummaryCard[] {
   ];
 }
 
+function buildContractNotificationItem(
+  contract: ContractRecord,
+  targetDate: string
+): ContractNotificationItem {
+  const remainingDays = daysUntil(targetDate);
+
+  return {
+    dateLabel: formatLongDate(targetDate),
+    daysLabel:
+      remainingDays === 0
+        ? 'Expires today'
+        : remainingDays === 1
+          ? 'Expires in 1 day'
+          : `Expires in ${remainingDays} days`,
+    id: contract.id,
+    parties: contract.contractingParties,
+    title: contract.contractNumber,
+  };
+}
+
+function describeContractTermLength(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return 'Duration unavailable';
+  }
+
+  const cursor = new Date(start.getTime());
+  let months = 0;
+
+  while (true) {
+    const next = new Date(cursor.getFullYear(), cursor.getMonth() + 1, cursor.getDate());
+    if (next <= end) {
+      months += 1;
+      cursor.setTime(next.getTime());
+      continue;
+    }
+
+    break;
+  }
+
+  const days = Math.round((end.getTime() - cursor.getTime()) / 86400000);
+  const monthLabel = months === 1 ? '1 month' : `${months} months`;
+  const dayLabel = days === 1 ? '1 day' : `${days} days`;
+
+  if (!months) {
+    return dayLabel;
+  }
+
+  if (!days) {
+    return monthLabel;
+  }
+
+  return `${monthLabel}, ${dayLabel}`;
+}
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 export default function ContractsScreen() {
   const { logout, session } = useAuth();
   const { hasActiveSubscription, subscriptionLoading } = useSubscription();
@@ -199,11 +364,28 @@ export default function ContractsScreen() {
   const [contractsLoading, setContractsLoading] = useState(false);
   const [contractSearch, setContractSearch] = useState('');
   const [contractFilter, setContractFilter] = useState<ContractFilter>('ALL');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+  const [selectedContractDetail, setSelectedContractDetail] = useState<ContractRecord | null>(null);
   const [contractActionMenuOpen, setContractActionMenuOpen] = useState(false);
   const [contractViewOpen, setContractViewOpen] = useState(false);
+  const [contractDetailLoading, setContractDetailLoading] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [timeline, setTimeline] = useState<ContractRenewalTimelineItem[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [completionDatePickerOpen, setCompletionDatePickerOpen] = useState(false);
+  const [markingExpiryCompleteId, setMarkingExpiryCompleteId] = useState<string | null>(null);
+  const [completionPickerMonth, setCompletionPickerMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [notificationConfirm, setNotificationConfirm] = useState<NotificationConfirmState>({
+    contractId: null,
+    expiryDate: '',
+    visible: false,
+  });
   const [actionMenuPosition, setActionMenuPosition] = useState<ActionMenuPosition>({ top: 0 });
   const [infoModal, setInfoModal] = useState<InfoModalState>({
     eyebrow: '',
@@ -257,6 +439,27 @@ export default function ContractsScreen() {
   const upcomingCount = useMemo(
     () => contracts.filter((contract) => getContractStatus(contract) === 'UPCOMING').length,
     [contracts]
+  );
+  const expiryNotifications = useMemo(
+    () =>
+      [...contracts]
+        .filter((contract) => {
+          const days = daysUntil(contract.contractExpiryDate);
+          return days >= 0 && days <= 14;
+        })
+        .sort((left, right) => daysUntil(left.contractExpiryDate) - daysUntil(right.contractExpiryDate))
+        .map((contract) => buildContractNotificationItem(contract, contract.contractExpiryDate)),
+    [contracts]
+  );
+  const totalNotificationCount = expiryNotifications.length;
+  const notificationConfirmContract = useMemo(
+    () => contracts.find((contract) => contract.id === notificationConfirm.contractId) ?? null,
+    [contracts, notificationConfirm.contractId]
+  );
+  const notificationConfirmBusy = markingExpiryCompleteId === notificationConfirm.contractId;
+  const notificationConfirmExpiryError = useMemo(
+    () => getExpiryCompletionError(notificationConfirmContract, notificationConfirm.expiryDate),
+    [notificationConfirm.expiryDate, notificationConfirmContract]
   );
 
   const readinessInsight = useMemo(() => {
@@ -346,6 +549,27 @@ export default function ContractsScreen() {
     return <Redirect href="/billing" />;
   }
 
+  async function fetchContractDetail(contractId: string) {
+    if (!session?.accessToken) {
+      return null;
+    }
+
+    setContractDetailLoading(true);
+
+    try {
+      const contract = await getContractById(session.accessToken, contractId);
+      setSelectedContractDetail(contract);
+      return contract;
+    } catch (error) {
+      if (!(error instanceof UnauthorizedError)) {
+        showToast(error instanceof Error ? error.message : 'Unable to load contract details.', 'error');
+      }
+      return null;
+    } finally {
+      setContractDetailLoading(false);
+    }
+  }
+
   function handleBottomNavPress(key: string) {
     if (key === 'home') {
       router.replace('/dashboard');
@@ -394,15 +618,46 @@ export default function ContractsScreen() {
   function handleContractPress(contractId: string, event: GestureResponderEvent) {
     const maxTop = Math.max(112, height - ACTION_MENU_HEIGHT - 112);
     setSelectedContractId(contractId);
+    setSelectedContractDetail(null);
     setActionMenuPosition({
       top: Math.min(maxTop, Math.max(112, event.nativeEvent.pageY - 6)),
     });
     setContractActionMenuOpen(true);
   }
 
-  function handleViewContract() {
+  async function handleViewContract() {
+    if (!selectedContractId) {
+      return;
+    }
+
     setContractActionMenuOpen(false);
-    setContractViewOpen(true);
+    const contract = await fetchContractDetail(selectedContractId);
+
+    if (contract) {
+      setContractViewOpen(true);
+    }
+  }
+
+  async function handleViewTimeline() {
+    if (!selectedContractId || !session?.accessToken) {
+      return;
+    }
+
+    setContractActionMenuOpen(false);
+    setTimelineLoading(true);
+    setTimelineOpen(true);
+
+    try {
+      const items = await getContractRenewalTimeline(session.accessToken, selectedContractId);
+      setTimeline(items);
+    } catch (error) {
+      if (!(error instanceof UnauthorizedError)) {
+        showToast(error instanceof Error ? error.message : 'Unable to load renewal timeline.', 'error');
+      }
+      setTimelineOpen(false);
+    } finally {
+      setTimelineLoading(false);
+    }
   }
 
   function handleEditContract() {
@@ -433,7 +688,9 @@ export default function ContractsScreen() {
       await deleteContract(session.accessToken, selectedContractId);
       setDeleteConfirmOpen(false);
       setContractViewOpen(false);
+      setTimelineOpen(false);
       setSelectedContractId(null);
+      setSelectedContractDetail(null);
       showToast('Contract deleted successfully.');
       await loadContracts({ silent: true });
     } catch (error) {
@@ -445,16 +702,129 @@ export default function ContractsScreen() {
     }
   }
 
-  async function handleOpenFile(url: string | null) {
-    if (!url) {
+  async function handleOpenContractDocument(contractId: string, fallbackUrl: string | null) {
+    if (!session?.accessToken) {
       return;
     }
 
     try {
-      await WebBrowser.openBrowserAsync(url);
+      const contract = await getContractById(session.accessToken, contractId);
+      setSelectedContractDetail(contract);
+
+      if (!contract.contractFileName) {
+        showToast('No contract document is attached to this record.', 'error');
+        return;
+      }
+
+      const downloadedFile = await File.downloadFileAsync(
+        `${apiConfig.baseUrl}/contracts/${contractId}/file`,
+        new File(Paths.cache, `${contractId}-${sanitizeFileName(contract.contractFileName)}`),
+        {
+          headers: {
+            Authorization: `Bearer ${session.accessToken}`,
+          },
+          idempotent: true,
+        }
+      );
+
+      const mimeType = contract.contractFileMimeType ?? 'application/octet-stream';
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(downloadedFile.uri, {
+          UTI: mimeType,
+          dialogTitle: contract.contractFileName,
+          mimeType,
+        });
+        return;
+      }
+
+      const localUrl =
+        Platform.OS === 'android'
+          ? await getContentUriAsync(downloadedFile.uri)
+          : downloadedFile.uri;
+
+      const canOpen = await Linking.canOpenURL(localUrl);
+
+      if (canOpen) {
+        await Linking.openURL(localUrl);
+        return;
+      }
+
+      if (fallbackUrl ?? contract.contractFileUrl) {
+        await WebBrowser.openBrowserAsync(contract.contractFileUrl ?? fallbackUrl!);
+        return;
+      }
+
+      showToast('Unable to preview this contract document on the device.', 'error');
     } catch {
       showToast('Unable to open contract file.', 'error');
     }
+  }
+
+  async function handleMarkExpiryComplete(contractId: string, contractExpiryDate: string) {
+    if (!session?.accessToken || markingExpiryCompleteId) {
+      return;
+    }
+
+    setMarkingExpiryCompleteId(contractId);
+
+    try {
+      await markContractExpiryComplete(session.accessToken, contractId, {
+        contractExpiryDate: contractExpiryDate.trim(),
+      });
+      setNotificationConfirm({ contractId: null, expiryDate: '', visible: false });
+      showToast('Contract expiry marked as complete.');
+      await loadContracts({ silent: true });
+    } catch (error) {
+      if (!(error instanceof UnauthorizedError)) {
+        showToast(error instanceof Error ? error.message : 'Unable to complete contract expiry.', 'error');
+      }
+    } finally {
+      setMarkingExpiryCompleteId(null);
+    }
+  }
+
+  function openNotificationConfirm(contractId: string) {
+    const contract = contracts.find((item) => item.id === contractId) ?? null;
+    setNotificationConfirm({
+      contractId,
+      expiryDate: contract ? advanceContractExpiryDate(contract.contractExpiryDate) : '',
+      visible: true,
+    });
+  }
+
+  function openCompletionDatePicker() {
+    const source = notificationConfirm.expiryDate && /^\d{4}-\d{2}-\d{2}$/.test(notificationConfirm.expiryDate)
+      ? new Date(`${notificationConfirm.expiryDate}T00:00:00`)
+      : new Date();
+    setCompletionPickerMonth(new Date(source.getFullYear(), source.getMonth(), 1));
+    setCompletionDatePickerOpen(true);
+  }
+
+  function closeNotificationConfirm() {
+    if (notificationConfirmBusy) {
+      return;
+    }
+
+      setNotificationConfirm({
+        contractId: null,
+        expiryDate: '',
+        visible: false,
+      });
+      setCompletionDatePickerOpen(false);
+  }
+
+  async function handleConfirmNotificationAction() {
+    if (!notificationConfirm.contractId) {
+      return;
+    }
+
+    if (notificationConfirmExpiryError) {
+      showToast(notificationConfirmExpiryError, 'error');
+      return;
+    }
+
+    await handleMarkExpiryComplete(notificationConfirm.contractId, notificationConfirm.expiryDate);
   }
 
   return (
@@ -463,14 +833,7 @@ export default function ContractsScreen() {
         avatarLetter={avatarLetter}
         bottomSlot={<FloatingBottomNav activeKey={moreMenuOpen ? 'more' : 'contracts'} onPress={handleBottomNavPress} />}
         onBackPress={() => router.replace('/dashboard')}
-        onNotificationPress={() =>
-          setInfoModal({
-            eyebrow: 'Notifications',
-            message: 'Contract reminder alerts will appear here as this workspace expands.',
-            title: 'Notifications',
-            visible: true,
-          })
-        }
+        onNotificationPress={() => setNotificationsOpen(true)}
         onProfilePress={() =>
           setInfoModal({
             eyebrow: 'Account',
@@ -499,7 +862,7 @@ export default function ContractsScreen() {
             <View style={styles.heroCopy}>
               <Text style={styles.heroTitle}>Contracts Hub</Text>
               <Text style={styles.heroBody}>
-                Keep every agreement, attachment, and key expiry date organised in one polished workspace.
+                Keep every agreement and key expiry date organised in one polished workspace.
               </Text>
             </View>
             <Pressable style={styles.addButton} onPress={handleOpenCreate}>
@@ -623,7 +986,261 @@ export default function ContractsScreen() {
 
       <AppModal
         footer={
-          selectedContract ? (
+          <Pressable style={styles.modalButton} onPress={() => setNotificationsOpen(false)}>
+            <Text style={styles.modalButtonText}>Close</Text>
+          </Pressable>
+        }
+        frameStyle={styles.notificationsModalFrame}
+        title={`Notifications (${totalNotificationCount})`}
+        visible={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}>
+        <View style={styles.modalSection}>
+          <Text style={styles.modalIntro}>
+            Contracts that are approaching expiry appear here so you can complete renewals before the deadline.
+          </Text>
+          {expiryNotifications.length ? (
+            <View style={styles.notificationList}>
+              {expiryNotifications.map((item, index) => (
+                <View
+                  key={item.id}
+                  style={[styles.notificationRow, index < expiryNotifications.length - 1 ? styles.notificationRowBorder : null]}>
+                  <View style={[styles.notificationIconWrap, styles.notificationIconWrapTertiary]}>
+                    <MaterialIcons color={palette.tertiary} name="event" size={20} />
+                  </View>
+                  <View style={styles.notificationCopy}>
+                    <Text style={styles.notificationTitle}>{item.title}</Text>
+                    <Text style={styles.notificationMeta}>{item.parties}</Text>
+                    <Text style={styles.notificationBody}>
+                      {item.daysLabel} - {item.dateLabel}
+                    </Text>
+                  </View>
+                  <Pressable
+                    disabled={markingExpiryCompleteId === item.id}
+                    hitSlop={8}
+                    style={[styles.markPaidButton, markingExpiryCompleteId === item.id ? styles.markPaidButtonDisabled : null]}
+                    onPress={() => openNotificationConfirm(item.id)}>
+                    {markingExpiryCompleteId === item.id ? (
+                      <ActivityIndicator color={palette.tertiary} size="small" />
+                    ) : (
+                      <MaterialIcons color={palette.tertiary} name="check-circle" size={24} />
+                    )}
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.notificationEmpty}>
+              <Text style={styles.notificationEmptyText}>
+                No expiring contracts right now. You are up to date.
+              </Text>
+            </View>
+          )}
+        </View>
+      </AppModal>
+
+      <AppModal
+        footer={
+          <Pressable style={styles.modalButton} onPress={() => setTimelineOpen(false)}>
+            <Text style={styles.modalButtonText}>Close</Text>
+          </Pressable>
+        }
+        frameStyle={styles.viewModalFrame}
+        title="Renewal timeline"
+        visible={timelineOpen}
+        onClose={() => setTimelineOpen(false)}>
+        {timelineLoading ? (
+          <View style={styles.modalLoadingState}>
+            <ActivityIndicator color={palette.primary} size="small" />
+            <Text style={styles.modalLoadingText}>Loading timeline...</Text>
+          </View>
+        ) : timeline.length ? (
+          <View style={styles.notificationList}>
+            {timeline.map((item, index) => (
+              <View
+                key={`${item.startDate}-${item.endDate}-${index}`}
+                style={[styles.notificationRow, index < timeline.length - 1 ? styles.notificationRowBorder : null]}>
+                <View style={[styles.notificationIconWrap, styles.notificationIconWrapPrimary]}>
+                  <MaterialIcons color={palette.primary} name="history" size={18} />
+                </View>
+                <View style={styles.notificationCopy}>
+                  <Text style={styles.notificationTitle}>
+                    {formatLongDate(item.startDate)} - {formatLongDate(item.endDate)}
+                  </Text>
+                  <Text style={styles.notificationMeta}>
+                    Term length: {describeContractTermLength(item.startDate, item.endDate)}
+                  </Text>
+                  <Text style={styles.notificationBody}>
+                    Renewed: {new Date(item.renewedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.modalLoadingState}>
+            <MaterialIcons color={palette.outline} name="history" size={28} />
+            <Text style={styles.modalLoadingText}>No renewal history yet.</Text>
+          </View>
+        )}
+      </AppModal>
+
+      <AppModal
+        footer={
+          <View style={styles.modalFooter}>
+            <Pressable
+              style={[styles.modalButton, styles.modalButtonOutline, notificationConfirmBusy ? styles.modalButtonDisabled : null]}
+              disabled={notificationConfirmBusy}
+              onPress={closeNotificationConfirm}>
+              <Text style={[styles.modalButtonText, styles.modalButtonTextOutline]}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.modalButton, notificationConfirmBusy ? styles.modalButtonDisabled : null]}
+              disabled={notificationConfirmBusy || !notificationConfirmContract || Boolean(notificationConfirmExpiryError)}
+              onPress={handleConfirmNotificationAction}>
+              {notificationConfirmBusy ? (
+                <ActivityIndicator color={palette.onPrimary} size="small" />
+              ) : (
+                <Text style={styles.modalButtonText}>Mark as complete</Text>
+              )}
+            </Pressable>
+          </View>
+        }
+        frameStyle={styles.deleteModalFrame}
+        title="Confirm expiry completion"
+        visible={notificationConfirm.visible}
+        onClose={closeNotificationConfirm}>
+        {notificationConfirmContract ? (
+          <View style={styles.detailList}>
+            <Text style={styles.modalIntro}>
+              Confirm that this contract expiry has been completed, then set the new expiry date for the renewed contract.
+            </Text>
+            <View style={styles.detailHeaderCard}>
+              <View
+                style={[styles.notificationIconWrap, styles.notificationIconWrapTertiary]}>
+                <MaterialIcons color={palette.tertiary} name="event" size={20} />
+              </View>
+              <View style={styles.detailHeaderCopy}>
+                <Text style={styles.detailHeaderTitle}>{notificationConfirmContract.contractNumber}</Text>
+                <Text style={styles.detailHeaderMeta}>{notificationConfirmContract.contractingParties}</Text>
+              </View>
+              <View
+                style={[
+                  styles.contractStatusPill,
+                  getContractStatus(notificationConfirmContract) === 'ACTIVE'
+                    ? styles.contractStatusPillActive
+                    : getContractStatus(notificationConfirmContract) === 'EXPIRING'
+                      ? styles.contractStatusPillExpiring
+                      : getContractStatus(notificationConfirmContract) === 'UPCOMING'
+                        ? styles.contractStatusPillUpcoming
+                        : styles.contractStatusPillExpired,
+                ]}>
+                <Text style={styles.contractStatusText}>{getContractStatus(notificationConfirmContract)}</Text>
+              </View>
+            </View>
+            <DetailRow label="Expiry date" value={formatLongDate(notificationConfirmContract.contractExpiryDate)} />
+            <DetailRow label="Start date" value={formatLongDate(notificationConfirmContract.contractStartDate)} />
+            <DetailRow label="Description" value={notificationConfirmContract.description ?? 'Not provided'} />
+            <AuthTextField
+              error={notificationConfirmExpiryError ?? ''}
+              icon="event-busy"
+              label="New Expiry Date"
+              placeholder="Select expiry date"
+              showSoftInputOnFocus={false}
+              value={notificationConfirm.expiryDate ? formatReadableDate(notificationConfirm.expiryDate) : ''}
+              onFocus={openCompletionDatePicker}
+            />
+          </View>
+        ) : (
+          <View style={styles.modalLoadingState}>
+            <Text style={styles.modalLoadingText}>No contract details available.</Text>
+          </View>
+        )}
+      </AppModal>
+
+      <AppModal
+        footer={
+          <View style={styles.modalFooter}>
+            <Pressable style={[styles.modalButton, styles.modalButtonOutline]} onPress={() => setCompletionDatePickerOpen(false)}>
+              <Text style={[styles.modalButtonText, styles.modalButtonTextOutline]}>Cancel</Text>
+            </Pressable>
+          </View>
+        }
+        frameStyle={styles.dateModalFrame}
+        title="Select expiry date"
+        visible={completionDatePickerOpen}
+        onClose={() => setCompletionDatePickerOpen(false)}>
+        <View style={styles.calendarHeader}>
+          <Pressable
+            style={styles.calendarNavButton}
+            onPress={() =>
+              setCompletionPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))
+            }>
+            <MaterialIcons color={palette.primary} name="chevron-left" size={22} />
+          </Pressable>
+          <Text style={styles.calendarTitle}>
+            {completionPickerMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+          </Text>
+          <Pressable
+            style={styles.calendarNavButton}
+            onPress={() =>
+              setCompletionPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))
+            }>
+            <MaterialIcons color={palette.primary} name="chevron-right" size={22} />
+          </Pressable>
+        </View>
+
+        <View style={styles.calendarWeekdays}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+            <Text key={day} style={styles.calendarWeekday}>
+              {day}
+            </Text>
+          ))}
+        </View>
+
+        <View style={styles.calendarGrid}>
+          {buildCalendarDays(completionPickerMonth).map((day, index) => {
+            const iso = day ? formatDateIso(day) : null;
+            const selected = iso === notificationConfirm.expiryDate;
+            const isDisabled =
+              day &&
+              notificationConfirmContract &&
+              new Date(`${iso}T00:00:00`) < new Date(`${notificationConfirmContract.contractStartDate}T00:00:00`);
+
+            return (
+              <Pressable
+                key={iso ?? `empty-${index}`}
+                disabled={!day || isDisabled}
+                style={[
+                  styles.calendarDay,
+                  !day ? styles.calendarDayEmpty : null,
+                  isDisabled ? styles.calendarDayPast : null,
+                  selected ? styles.calendarDaySelected : null,
+                ]}
+                onPress={() => {
+                  setNotificationConfirm((current) => ({
+                    ...current,
+                    expiryDate: formatDateIso(day!),
+                  }));
+                  setCompletionDatePickerOpen(false);
+                }}>
+                <Text
+                  style={[
+                    styles.calendarDayText,
+                    !day ? styles.calendarDayTextEmpty : null,
+                    isDisabled ? styles.calendarDayTextPast : null,
+                    selected ? styles.calendarDayTextSelected : null,
+                  ]}>
+                  {day ? day.getDate() : 0}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </AppModal>
+
+      <AppModal
+        footer={
+          selectedContractDetail ? (
             <View style={styles.modalFooter}>
               <Pressable style={[styles.modalButton, styles.modalButtonOutline]} onPress={() => setContractViewOpen(false)}>
                 <Text style={[styles.modalButtonText, styles.modalButtonTextOutline]}>Close</Text>
@@ -638,59 +1255,84 @@ export default function ContractsScreen() {
         title="Contract details"
         visible={contractViewOpen}
         onClose={() => setContractViewOpen(false)}>
-        {selectedContract ? (
+        {contractDetailLoading ? (
+          <View style={styles.modalLoadingState}>
+            <ActivityIndicator color={palette.primary} size="small" />
+            <Text style={styles.modalLoadingText}>Loading contract details...</Text>
+          </View>
+        ) : selectedContractDetail ? (
           <View style={styles.modalSection}>
             <View style={styles.detailHeaderCard}>
               <View style={[styles.notificationIconWrap, styles.notificationIconWrapPrimary]}>
                 <MaterialIcons color={palette.primary} name="description" size={20} />
               </View>
               <View style={styles.detailHeaderCopy}>
-                <Text style={styles.detailHeaderTitle}>{selectedContract.contractNumber}</Text>
-                <Text style={styles.detailHeaderMeta}>{selectedContract.contractingParties}</Text>
+                <Text style={styles.detailHeaderTitle}>{selectedContractDetail.contractNumber}</Text>
+                <Text style={styles.detailHeaderMeta}>{selectedContractDetail.contractingParties}</Text>
               </View>
               <View
                 style={[
                   styles.contractStatusPill,
-                  getContractStatus(selectedContract) === 'ACTIVE'
+                  getContractStatus(selectedContractDetail) === 'ACTIVE'
                     ? styles.contractStatusPillActive
-                    : getContractStatus(selectedContract) === 'EXPIRING'
+                    : getContractStatus(selectedContractDetail) === 'EXPIRING'
                       ? styles.contractStatusPillExpiring
-                      : getContractStatus(selectedContract) === 'UPCOMING'
+                      : getContractStatus(selectedContractDetail) === 'UPCOMING'
                         ? styles.contractStatusPillUpcoming
                         : styles.contractStatusPillExpired,
                 ]}>
-                <Text style={styles.contractStatusText}>{getContractStatus(selectedContract)}</Text>
+                <Text style={styles.contractStatusText}>{getContractStatus(selectedContractDetail)}</Text>
               </View>
             </View>
 
             <View style={styles.detailList}>
-              <DetailRow label="Start date" value={formatLongDate(selectedContract.contractStartDate)} />
-              <DetailRow label="Expiry date" value={formatLongDate(selectedContract.contractExpiryDate)} />
+              <DetailRow label="Start date" value={formatLongDate(selectedContractDetail.contractStartDate)} />
+              <DetailRow label="Expiry date" value={formatLongDate(selectedContractDetail.contractExpiryDate)} />
               <DetailRow
                 label="Notifications"
-                value={selectedContract.allowPushNotif ? 'Enabled' : 'Disabled'}
+                value={selectedContractDetail.allowPushNotif ? 'Enabled' : 'Disabled'}
               />
               <DetailRow
                 label="Description"
-                value={selectedContract.description?.trim() || 'No description provided'}
+                value={selectedContractDetail.description?.trim() || 'No description provided'}
               />
               <DetailRow
                 label="Contract file"
-                value={selectedContract.contractFileName ?? 'No file attached'}
+                value={selectedContractDetail.contractFileName ?? 'No file attached'}
               />
-              {selectedContract.contractFileName ? (
-                <DetailRow
-                  label="File size"
-                  value={formatFileSize(selectedContract.contractFileSize)}
-                />
-              ) : null}
             </View>
 
-            {selectedContract.contractFileUrl ? (
-              <Pressable style={styles.fileOpenButton} onPress={() => handleOpenFile(selectedContract.contractFileUrl)}>
-                <MaterialIcons color={palette.primary} name="open-in-new" size={18} />
-                <Text style={styles.fileOpenButtonText}>Open contract file</Text>
-              </Pressable>
+            <View style={styles.documentCard}>
+              <View style={styles.documentIconWrap}>
+                <MaterialIcons color={palette.primary} name="attach-file" size={22} />
+              </View>
+              <View style={styles.documentCopy}>
+                <Text style={styles.documentTitle}>
+                  {selectedContractDetail.contractFileName ?? 'No contract file attached'}
+                </Text>
+                <Text style={styles.documentBody}>
+                  {selectedContractDetail.contractFileName
+                    ? 'Open the uploaded contract document from this record.'
+                    : 'No uploaded document is available for this contract yet.'}
+                </Text>
+              </View>
+            </View>
+
+            {selectedContractDetail.contractFileName ? (
+              <View style={styles.documentActionRow}>
+                <View style={styles.documentSizeWrap}>
+                  <Text style={styles.documentSizeLabel}>File size</Text>
+                  <Text style={styles.documentSizeValue}>
+                    {formatFileSize(selectedContractDetail.contractFileSize)}
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.fileOpenButton}
+                  onPress={() => handleOpenContractDocument(selectedContractDetail.id, selectedContractDetail.contractFileUrl)}>
+                  <MaterialIcons color={palette.primary} name="open-in-new" size={18} />
+                  <Text style={styles.fileOpenButtonText}>View document</Text>
+                </Pressable>
+              </View>
             ) : null}
           </View>
         ) : (
@@ -740,23 +1382,29 @@ export default function ContractsScreen() {
               </View>
               <Text style={styles.actionMenuTitle}>View</Text>
             </Pressable>
+            <Pressable style={styles.actionMenuItem} onPress={handleViewTimeline}>
+              <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
+                <MaterialIcons color={palette.primary} name="history" size={18} />
+              </View>
+              <Text style={styles.actionMenuTitle}>Timeline</Text>
+            </Pressable>
             <Pressable style={styles.actionMenuItem} onPress={handleEditContract}>
               <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
                 <MaterialIcons color={palette.primary} name="edit" size={18} />
               </View>
               <Text style={styles.actionMenuTitle}>Edit</Text>
             </Pressable>
-            {selectedContract.contractFileUrl ? (
+            {selectedContract.contractFileName ? (
               <Pressable
                 style={styles.actionMenuItem}
                 onPress={() => {
                   setContractActionMenuOpen(false);
-                  handleOpenFile(selectedContract.contractFileUrl);
+                  handleOpenContractDocument(selectedContract.id, selectedContract.contractFileUrl);
                 }}>
                 <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
                   <MaterialIcons color={palette.primary} name="attach-file" size={18} />
                 </View>
-                <Text style={styles.actionMenuTitle}>Open file</Text>
+                <Text style={styles.actionMenuTitle}>View document</Text>
               </Pressable>
             ) : null}
             <Pressable style={styles.actionMenuItem} onPress={handleDeletePrompt}>
@@ -1044,6 +1692,34 @@ const styles = StyleSheet.create({
   notificationIconWrapPrimary: {
     backgroundColor: 'rgba(0, 92, 171, 0.1)',
   },
+  notificationIconWrapTertiary: {
+    backgroundColor: 'rgba(181, 28, 0, 0.1)',
+  },
+  notificationList: {
+    backgroundColor: palette.surfaceContainerLowest,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  notificationMeta: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+  },
+  notificationRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  notificationRowBorder: {
+    borderBottomColor: '#F1F5F9',
+    borderBottomWidth: 1,
+  },
+  notificationTitle: {
+    color: palette.onSurface,
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
   emptyState: {
     alignItems: 'center',
     gap: spacing.sm,
@@ -1061,15 +1737,69 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '700',
   },
+  documentBody: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+  },
+  documentActionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'space-between',
+  },
+  documentCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderColor: 'rgba(192, 199, 214, 0.55)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  documentCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  documentIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 92, 171, 0.1)',
+    borderRadius: radius.pill,
+    height: 42,
+    justifyContent: 'center',
+    width: 42,
+  },
+  documentSizeLabel: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.label,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  documentSizeValue: {
+    color: palette.onSurface,
+    fontSize: typography.bodySmall,
+    fontWeight: '700',
+  },
+  documentSizeWrap: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  documentTitle: {
+    color: palette.onSurface,
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
   fileOpenButton: {
     alignItems: 'center',
-    alignSelf: 'flex-start',
     backgroundColor: 'rgba(0, 92, 171, 0.08)',
     borderColor: 'rgba(0, 92, 171, 0.16)',
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.xs,
+    minHeight: 42,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
@@ -1102,6 +1832,74 @@ const styles = StyleSheet.create({
     color: palette.white,
     fontSize: typography.display,
     fontWeight: '700',
+  },
+  calendarDay: {
+    alignItems: 'center',
+    aspectRatio: 1,
+    borderRadius: radius.md,
+    justifyContent: 'center',
+    width: '13.3%',
+  },
+  calendarDayEmpty: {
+    opacity: 0,
+  },
+  calendarDayPast: {
+    opacity: 0.3,
+  },
+  calendarDaySelected: {
+    backgroundColor: palette.primary,
+  },
+  calendarDayText: {
+    color: palette.onSurface,
+    fontSize: typography.bodySmall,
+    fontWeight: '600',
+  },
+  calendarDayTextEmpty: {
+    color: 'transparent',
+  },
+  calendarDayTextPast: {
+    color: palette.onSurfaceVariant,
+  },
+  calendarDayTextSelected: {
+    color: palette.onPrimary,
+  },
+  calendarGrid: {
+    columnGap: spacing.xs,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: spacing.xs,
+  },
+  calendarHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  calendarNavButton: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  calendarTitle: {
+    color: palette.onSurface,
+    fontSize: typography.title,
+    fontWeight: '700',
+  },
+  calendarWeekday: {
+    color: palette.onSurfaceVariant,
+    flex: 1,
+    fontSize: typography.label,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  calendarWeekdays: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  dateModalFrame: {
+    maxHeight: '56%',
+    maxWidth: 420,
   },
   listCard: {
     backgroundColor: palette.surfaceContainerLowest,
@@ -1161,6 +1959,28 @@ const styles = StyleSheet.create({
   modalSection: {
     gap: spacing.md,
   },
+  notificationBody: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+  },
+  notificationCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  notificationEmpty: {
+    backgroundColor: 'rgba(255,255,255,0.52)',
+    borderColor: 'rgba(192, 199, 214, 0.55)',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: spacing.md,
+  },
+  notificationEmptyText: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+  },
+  notificationsModalFrame: {
+    maxHeight: '70%',
+  } as ViewStyle,
   moreMenu: {
     alignSelf: 'center',
     backgroundColor: 'rgba(255,255,255,0.98)',
@@ -1305,4 +2125,14 @@ const styles = StyleSheet.create({
   viewModalFrame: {
     maxHeight: '75%',
   } as ViewStyle,
+  markPaidButton: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  markPaidButtonDisabled: {
+    opacity: 0.5,
+  },
 });
