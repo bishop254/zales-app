@@ -320,7 +320,7 @@ export default function DashboardScreen() {
                 style={styles.moreMenuItem}
                 onPress={() => {
                   setMoreMenuOpen(false);
-                  Alert.alert('Support', 'Support workspace can be connected next.');
+                  router.push('/support-tickets');
                 }}>
                 <View style={styles.moreMenuIconWrap}>
                   <MaterialIcons color={palette.primary} name="contact-support" size={20} />

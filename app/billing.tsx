@@ -538,11 +538,7 @@ export default function BillingScreen() {
               style={styles.moreMenuItem}
               onPress={() => {
                 setMoreMenuOpen(false);
-                openInfoModal({
-                  eyebrow: 'Support',
-                  message: 'Support workspace can be connected next.',
-                  title: 'Support',
-                });
+                router.push('/support-tickets');
               }}>
               <View style={styles.moreMenuIconWrap}>
                 <MaterialIcons color={palette.primary} name="contact-support" size={20} />

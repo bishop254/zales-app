@@ -1154,12 +1154,7 @@ export default function CoversScreen() {
               style={styles.moreMenuItem}
               onPress={() => {
                 setMoreMenuOpen(false);
-                setInfoModal({
-                  eyebrow: 'Support',
-                  message: 'Support workspace can be connected next.',
-                  title: 'Support',
-                  visible: true,
-                });
+                router.push('/support-tickets');
               }}>
               <View style={styles.moreMenuIconWrap}>
                 <MaterialIcons color={palette.primary} name="contact-support" size={20} />
