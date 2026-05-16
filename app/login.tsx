@@ -1,14 +1,23 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppModal } from '@/components/app/app-modal';
 import { AuthBackground, AuthButton, AuthCard, AuthTextField } from '@/components/auth/auth-primitives';
-import { palette, spacing, typography } from '@/constants/app-theme';
+import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { validateEmail, validatePassword } from '@/features/auth/validation';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/providers/toast-provider';
+
+type FeedbackModalState = {
+  eyebrow: string;
+  message: string;
+  tone: 'error' | 'info';
+  title: string;
+  visible: boolean;
+};
 
 export default function LoginScreen() {
   const { login, loginWithGoogle } = useAuth();
@@ -18,6 +27,13 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState<FeedbackModalState>({
+    eyebrow: '',
+    message: '',
+    tone: 'info',
+    title: '',
+    visible: false,
+  });
   const hasHandledRegistrationToast = useRef(false);
 
   const errors = useMemo(
@@ -37,6 +53,28 @@ export default function LoginScreen() {
       router.setParams({ registered: undefined });
     }
   }, [registered, showToast]);
+
+  function openFeedbackModal({
+    eyebrow,
+    message,
+    tone,
+    title,
+  }: Omit<FeedbackModalState, 'visible'>) {
+    setFeedbackModal({
+      eyebrow,
+      message,
+      tone,
+      title,
+      visible: true,
+    });
+  }
+
+  function closeFeedbackModal() {
+    setFeedbackModal((current) => ({
+      ...current,
+      visible: false,
+    }));
+  }
 
   async function handleSubmit() {
     if (!canSubmit || submitting) {
@@ -58,7 +96,12 @@ export default function LoginScreen() {
       const message =
         error instanceof Error ? error.message : 'Please check the backend connection and try again.';
       showToast(message, 'error');
-      Alert.alert('Login failed', message);
+      openFeedbackModal({
+        eyebrow: 'Sign-in error',
+        message,
+        title: 'Login failed',
+        tone: 'error',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -77,7 +120,12 @@ export default function LoginScreen() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start Google sign-in.';
       showToast(message, 'error');
-      Alert.alert('Google sign-in failed', message);
+      openFeedbackModal({
+        eyebrow: 'Google sign-in',
+        message,
+        title: 'Google sign-in failed',
+        tone: 'error',
+      });
     } finally {
       setGoogleSubmitting(false);
     }
@@ -115,7 +163,14 @@ export default function LoginScreen() {
             secureTextEntry
             secureToggle
             value={password}
-            onActionPress={() => Alert.alert('Coming soon', 'Password recovery is not wired yet.')}
+            onActionPress={() =>
+              openFeedbackModal({
+                eyebrow: 'Coming soon',
+                message: 'Password recovery is not wired yet.',
+                title: 'Forgot password',
+                tone: 'info',
+              })
+            }
             onChangeText={setPassword}
           />
 
@@ -145,6 +200,42 @@ export default function LoginScreen() {
           </View>
         </AuthCard>
       </AuthBackground>
+
+      <AppModal
+        eyebrow={feedbackModal.eyebrow}
+        footer={
+          <Pressable
+            style={[
+              styles.modalButton,
+              feedbackModal.tone === 'error' ? styles.modalButtonError : null,
+            ]}
+            onPress={closeFeedbackModal}>
+            <Text style={styles.modalButtonText}>Okay</Text>
+          </Pressable>
+        }
+        title={feedbackModal.title}
+        visible={feedbackModal.visible}
+        onClose={closeFeedbackModal}>
+        <View style={styles.modalNotice}>
+          <View
+            style={[
+              styles.modalIconWrap,
+              feedbackModal.tone === 'error' ? styles.modalIconWrapError : styles.modalIconWrapInfo,
+            ]}>
+            <MaterialIcons
+              color={feedbackModal.tone === 'error' ? palette.error : palette.primary}
+              name={feedbackModal.tone === 'error' ? 'error-outline' : 'info-outline'}
+              size={24}
+            />
+          </View>
+          <View style={styles.modalCopy}>
+            <Text style={styles.modalHeading}>
+              {feedbackModal.tone === 'error' ? "We couldn't complete that sign-in." : 'A quick update for you'}
+            </Text>
+            <Text style={styles.modalMessage}>{feedbackModal.message}</Text>
+          </View>
+        </View>
+      </AppModal>
     </>
   );
 }
@@ -193,5 +284,58 @@ const styles = StyleSheet.create({
     color: palette.onSurfaceVariant,
     fontSize: typography.bodySmall,
     textAlign: 'center',
+  },
+  modalButton: {
+    alignItems: 'center',
+    backgroundColor: palette.primary,
+    borderRadius: radius.md,
+    justifyContent: 'center',
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
+  },
+  modalButtonError: {
+    backgroundColor: palette.error,
+  },
+  modalButtonText: {
+    color: palette.onPrimary,
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
+  modalCopy: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  modalHeading: {
+    color: palette.onSurface,
+    fontSize: typography.title,
+    fontWeight: '700',
+  },
+  modalIconWrap: {
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    height: 52,
+    justifyContent: 'center',
+    width: 52,
+  },
+  modalIconWrapError: {
+    backgroundColor: palette.errorContainer,
+  },
+  modalIconWrapInfo: {
+    backgroundColor: palette.primaryFixed,
+  },
+  modalMessage: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.body,
+    lineHeight: 22,
+  },
+  modalNotice: {
+    alignItems: 'flex-start',
+    backgroundColor: palette.surfaceContainerLowest,
+    borderColor: palette.outlineVariant,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.md,
   },
 });

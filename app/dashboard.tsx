@@ -70,6 +70,11 @@ export default function DashboardScreen() {
     }
 
     setMoreMenuOpen(false);
+    if (key === 'contracts') {
+      router.push('/contracts');
+      return;
+    }
+
     if (key === 'covers') {
       router.push('/covers');
       return;
@@ -86,6 +91,11 @@ export default function DashboardScreen() {
 
     if (item.title === 'Insurance' || item.icon === 'shield') {
       router.push('/covers');
+      return;
+    }
+
+    if (item.title === 'Contracts' || item.icon === 'description') {
+      router.push('/contracts');
       return;
     }
 

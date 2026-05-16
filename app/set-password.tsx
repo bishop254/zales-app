@@ -1,8 +1,9 @@
 import { Redirect, router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
+import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AuthBackground, AuthButton, AuthCard, AuthHeader, AuthTextField } from '@/components/auth/auth-primitives';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { validateConfirmPassword, validatePassword } from '@/features/auth/validation';
@@ -15,6 +16,8 @@ export default function SetPasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
 
   const errors = useMemo(
     () => ({
@@ -43,7 +46,8 @@ export default function SetPasswordScreen() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to set password.';
       showToast(message, 'error');
-      Alert.alert('Set password failed', message);
+      setFeedbackMessage(message);
+      setFeedbackModalVisible(true);
     } finally {
       setSubmitting(false);
     }
@@ -91,6 +95,14 @@ export default function SetPasswordScreen() {
           </View>
         </AuthCard>
       </AuthBackground>
+      <AppMessageModal
+        eyebrow="Password setup"
+        message={feedbackMessage}
+        title="Set password failed"
+        tone="error"
+        visible={feedbackModalVisible}
+        onClose={() => setFeedbackModalVisible(false)}
+      />
     </>
   );
 }

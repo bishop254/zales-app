@@ -4,7 +4,6 @@ import { Redirect, router } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -14,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AppModal } from '@/components/app/app-modal';
 import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
@@ -35,6 +35,12 @@ import { useSubscription } from '@/providers/subscription-provider';
 import { useToast } from '@/providers/toast-provider';
 
 type CheckoutStep = 'idle' | 'submitting' | 'polling' | 'success' | 'failed';
+type InfoModalState = {
+  eyebrow: string;
+  message: string;
+  title: string;
+  visible: boolean;
+};
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLLS = 12; // 36 seconds
@@ -72,6 +78,12 @@ export default function BillingScreen() {
   const [phoneError, setPhoneError] = useState('');
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>('idle');
   const [checkoutError, setCheckoutError] = useState('');
+  const [infoModal, setInfoModal] = useState<InfoModalState>({
+    eyebrow: '',
+    message: '',
+    title: '',
+    visible: false,
+  });
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollCountRef = useRef(0);
 
@@ -135,10 +147,31 @@ export default function BillingScreen() {
     logout({ animated: true, redirectToLogin: true });
   }
 
+  function openInfoModal({ eyebrow, message, title }: Omit<InfoModalState, 'visible'>) {
+    setInfoModal({
+      eyebrow,
+      message,
+      title,
+      visible: true,
+    });
+  }
+
+  function closeInfoModal() {
+    setInfoModal((current) => ({
+      ...current,
+      visible: false,
+    }));
+  }
+
   function handleBottomNavPress(key: string) {
     if (key === 'home') {
       setMoreMenuOpen(false);
       router.replace('/dashboard');
+      return;
+    }
+    if (key === 'contracts') {
+      setMoreMenuOpen(false);
+      router.push('/contracts');
       return;
     }
     if (key === 'covers') {
@@ -151,10 +184,11 @@ export default function BillingScreen() {
       return;
     }
     setMoreMenuOpen(false);
-    Alert.alert(
-      key === 'tasks' ? 'Tasks' : 'Contracts',
-      'This workspace can be connected next.'
-    );
+    openInfoModal({
+      eyebrow: 'Workspace',
+      message: 'This workspace can be connected next.',
+      title: 'Tasks',
+    });
   }
 
   function openPlanModal(plan: BillingPlan) {
@@ -258,10 +292,18 @@ export default function BillingScreen() {
         }
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() =>
-          Alert.alert('Notifications', 'Notification center can be connected next.')
+          openInfoModal({
+            eyebrow: 'Notifications',
+            message: 'Notification center can be connected next.',
+            title: 'Notifications',
+          })
         }
         onProfilePress={() =>
-          Alert.alert('Account', `Signed in as ${session.email}`)
+          openInfoModal({
+            eyebrow: 'Account',
+            message: `Signed in as ${session.email}`,
+            title: 'Account',
+          })
         }
         profileImageUrl={session.profileImageUrl}
         scrollViewProps={{ onScrollBeginDrag: () => setMoreMenuOpen(false) }}
@@ -496,7 +538,11 @@ export default function BillingScreen() {
               style={styles.moreMenuItem}
               onPress={() => {
                 setMoreMenuOpen(false);
-                Alert.alert('Support', 'Support workspace can be connected next.');
+                openInfoModal({
+                  eyebrow: 'Support',
+                  message: 'Support workspace can be connected next.',
+                  title: 'Support',
+                });
               }}>
               <View style={styles.moreMenuIconWrap}>
                 <MaterialIcons color={palette.primary} name="contact-support" size={20} />
@@ -785,6 +831,13 @@ export default function BillingScreen() {
           </View>
         )}
       </AppModal>
+      <AppMessageModal
+        eyebrow={infoModal.eyebrow}
+        message={infoModal.message}
+        title={infoModal.title}
+        visible={infoModal.visible}
+        onClose={closeInfoModal}
+      />
     </>
   );
 }

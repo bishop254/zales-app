@@ -25,6 +25,7 @@ export default function RootLayout() {
               <Stack.Screen name="dashboard" />
               <Stack.Screen name="billing" />
               <Stack.Screen name="covers" />
+              <Stack.Screen name="cover-form" />
             </Stack>
           </SubscriptionProvider>
         </AuthProvider>

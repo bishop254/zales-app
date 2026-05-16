@@ -4,41 +4,28 @@ import { Redirect, router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   TextInput,
+  type GestureResponderEvent,
   type ViewStyle,
   useWindowDimensions,
   View,
 } from 'react-native';
 
+import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AppModal } from '@/components/app/app-modal';
 import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
-import { AuthTextField } from '@/components/auth/auth-primitives';
+import { SummaryCard, type SummaryCardTone } from '@/components/dashboard/summary-card';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
-import { type CoverRecord, type PaymentTimelineItem, createCover, deleteCover, getCoverById, getCovers, getPaymentTimeline, markCyclePaid, markExpiryComplete, updateCover } from '@/features/covers/covers-api';
+import { type CoverRecord, type PaymentTimelineItem, deleteCover, getCoverById, getCovers, getPaymentTimeline, markCyclePaid, markExpiryComplete } from '@/features/covers/covers-api';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
 import { useToast } from '@/providers/toast-provider';
-
-const iconToneStyles = StyleSheet.create({
-  neutral: { backgroundColor: 'rgba(230, 232, 234, 0.6)' },
-  primary: { backgroundColor: 'rgba(0, 92, 171, 0.1)' },
-  secondary: { backgroundColor: 'rgba(207, 225, 248, 0.35)' },
-  tertiary: { backgroundColor: 'rgba(181, 28, 0, 0.1)' },
-});
-
-const iconToneColors = {
-  neutral: palette.outline,
-  primary: palette.primary,
-  secondary: palette.onSecondaryContainer,
-  tertiary: palette.tertiary,
-};
 
 type CoverStatus = 'ACTIVE' | 'DUE' | 'LAPSED';
 type CoverFilter = 'ALL' | CoverStatus;
@@ -47,7 +34,7 @@ type CoverSummaryCard = {
   count: string;
   filter: CoverFilter;
   icon: keyof typeof MaterialIcons.glyphMap;
-  iconTone: 'primary' | 'secondary' | 'tertiary' | 'neutral';
+  iconTone: SummaryCardTone;
   label: string;
   title: string;
 };
@@ -70,55 +57,26 @@ type CoverNotificationItem = {
   type: string;
 };
 
-type CreateCoverForm = {
-  allowPushNotif: boolean;
-  currency: string;
-  customerIdentifier: string;
-  cycle: 'MONTHLY' | 'ANNUAL';
-  email: string;
-  expiryDate: string;
-  insurancePremium: string;
-  insuranceProduct: string;
-  insuranceProvider: string;
-  phone: string;
-  policyNumber: string;
-  vehicleReg: string;
+type NotificationActionKind = 'cycle' | 'expiry';
+
+type NotificationConfirmState = {
+  coverId: string | null;
+  kind: NotificationActionKind | null;
+  visible: boolean;
 };
 
-type CreateCoverTouched = {
-  customerIdentifier: boolean;
-  cycle: boolean;
-  email: boolean;
-  expiryDate: boolean;
-  insurancePremium: boolean;
-  insuranceProduct: boolean;
-  insuranceProvider: boolean;
+type InfoModalState = {
+  eyebrow: string;
+  message: string;
+  title: string;
+  visible: boolean;
 };
 
-const INITIAL_FORM: CreateCoverForm = {
-  allowPushNotif: true,
-  currency: 'KES',
-  customerIdentifier: '',
-  cycle: 'MONTHLY',
-  email: '',
-  expiryDate: '',
-  insurancePremium: '',
-  insuranceProduct: '',
-  insuranceProvider: '',
-  phone: '',
-  policyNumber: '',
-  vehicleReg: '',
+type ActionMenuPosition = {
+  top: number;
 };
 
-const INITIAL_TOUCHED: CreateCoverTouched = {
-  customerIdentifier: false,
-  cycle: false,
-  email: false,
-  expiryDate: false,
-  insurancePremium: false,
-  insuranceProduct: false,
-  insuranceProvider: false,
-};
+const ACTION_MENU_HEIGHT = 208;
 
 const EXPIRY_NOTICE_DAYS = 14;
 const MONTHLY_DUE_NOTICE_DAYS = 5;
@@ -139,35 +97,6 @@ function formatLongDate(dateValue: string | null) {
     month: 'short',
     year: 'numeric',
   }).format(parsed);
-}
-
-function formatDateIso(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function buildCalendarDays(monthDate: Date) {
-  const year = monthDate.getFullYear();
-  const month = monthDate.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (Date | null)[] = [];
-
-  for (let index = 0; index < firstDay; index += 1) {
-    cells.push(null);
-  }
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    cells.push(new Date(year, month, day));
-  }
-
-  while (cells.length % 7 !== 0) {
-    cells.push(null);
-  }
-
-  return cells;
 }
 
 function daysUntil(dateValue: string | null) {
@@ -278,23 +207,6 @@ function buildSummaryCards(covers: CoverRecord[]): CoverSummaryCard[] {
   ];
 }
 
-function validateCreateForm(form: CreateCoverForm) {
-  if (!form.customerIdentifier.trim()) return 'Customer name is required.';
-  if (!form.insuranceProvider.trim()) return 'Insurance provider is required.';
-  if (!form.insuranceProduct.trim()) return 'Insurance product is required.';
-  if (!form.insurancePremium.trim()) return 'Premium is required.';
-  if (Number.isNaN(Number(form.insurancePremium)) || Number(form.insurancePremium) < 0) {
-    return 'Premium must be a valid number.';
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(form.expiryDate.trim())) {
-    return 'Expiry date must use YYYY-MM-DD.';
-  }
-  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-    return 'Email address looks invalid.';
-  }
-  return null;
-}
-
 function buildCoverNotificationItem(
   cover: CoverRecord,
   targetDate: string,
@@ -331,16 +243,10 @@ export default function CoversScreen() {
   const [covers, setCovers] = useState<CoverRecord[]>([]);
   const [coverSearch, setCoverSearch] = useState('');
   const [coverFilter, setCoverFilter] = useState<CoverFilter>('ALL');
-  const [coverForm, setCoverForm] = useState<CreateCoverForm>(INITIAL_FORM);
-  const [coverTouched, setCoverTouched] = useState<CreateCoverTouched>(INITIAL_TOUCHED);
   const [coversLoading, setCoversLoading] = useState(false);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [createSubmitting, setCreateSubmitting] = useState(false);
-  const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-  const [cyclePickerOpen, setCyclePickerOpen] = useState(false);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [coverActionMenuOpen, setCoverActionMenuOpen] = useState(false);
+  const [actionMenuPosition, setActionMenuPosition] = useState<ActionMenuPosition>({ top: 0 });
   const [coverViewOpen, setCoverViewOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [coverDetailLoading, setCoverDetailLoading] = useState(false);
@@ -350,13 +256,20 @@ export default function CoversScreen() {
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [timeline, setTimeline] = useState<PaymentTimelineItem[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
+  const [notificationConfirm, setNotificationConfirm] = useState<NotificationConfirmState>({
+    coverId: null,
+    kind: null,
+    visible: false,
+  });
   const [selectedCoverId, setSelectedCoverId] = useState<string | null>(null);
   const [selectedCoverDetail, setSelectedCoverDetail] = useState<CoverRecord | null>(null);
-  const [pickerMonth, setPickerMonth] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+  const [infoModal, setInfoModal] = useState<InfoModalState>({
+    eyebrow: '',
+    message: '',
+    title: '',
+    visible: false,
   });
-  const { width } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const avatarLetter = ((session?.name?.trim() || session?.email || '?').slice(0, 1)).toUpperCase();
   const cardWidth = (width - spacing.marginMobile * 2 - spacing.md) / 2;
   const listItems = useMemo(() => covers.map(mapCoverToListItem), [covers]);
@@ -383,6 +296,8 @@ export default function CoversScreen() {
   }, [coverFilter, coverSearch, covers, listItems]);
   const coverSummaryCards = useMemo(() => buildSummaryCards(covers), [covers]);
   const dueSoonCount = useMemo(() => covers.filter((cover) => getCoverStatus(cover) === 'DUE').length, [covers]);
+  const lapsedCount = useMemo(() => covers.filter((cover) => getCoverStatus(cover) === 'LAPSED').length, [covers]);
+  const activeCount = useMemo(() => covers.filter((cover) => getCoverStatus(cover) === 'ACTIVE').length, [covers]);
   const cycleDueNotifications = useMemo(
     () =>
       sortBySoonestDate(
@@ -416,29 +331,44 @@ export default function CoversScreen() {
     [covers]
   );
   const totalNotificationCount = cycleDueNotifications.length + expiryNotifications.length;
-  const formErrors = useMemo(
-    () => ({
-      customerIdentifier: !coverForm.customerIdentifier.trim() ? 'Customer name is required.' : '',
-      cycle: !coverForm.cycle ? 'Select a billing cycle.' : '',
-      email:
-        coverForm.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(coverForm.email.trim())
-          ? 'Email address looks invalid.'
-          : '',
-      expiryDate: /^\d{4}-\d{2}-\d{2}$/.test(coverForm.expiryDate.trim())
-        ? ''
-        : 'Expiry date must use YYYY-MM-DD.',
-      insurancePremium:
-        !coverForm.insurancePremium.trim()
-          ? 'Premium is required.'
-          : Number.isNaN(Number(coverForm.insurancePremium)) || Number(coverForm.insurancePremium) < 0
-            ? 'Premium must be a valid number.'
-            : '',
-      insuranceProduct: !coverForm.insuranceProduct.trim() ? 'Insurance product is required.' : '',
-      insuranceProvider: !coverForm.insuranceProvider.trim() ? 'Insurance provider is required.' : '',
-    }),
-    [coverForm]
+  const notificationConfirmCover = useMemo(
+    () => covers.find((cover) => cover.id === notificationConfirm.coverId) ?? null,
+    [covers, notificationConfirm.coverId]
   );
-  const canSubmitForm = useMemo(() => Object.values(formErrors).every((value) => !value), [formErrors]);
+  const notificationConfirmBusy =
+    (notificationConfirm.kind === 'cycle' && markingPaidId === notificationConfirm.coverId) ||
+    (notificationConfirm.kind === 'expiry' && markingExpiryCompleteId === notificationConfirm.coverId);
+  const readinessInsight = useMemo(() => {
+    if (!covers.length) {
+      return {
+        body: 'Create your first cover record to start tracking renewals, due dates, and lapses from one place.',
+        icon: 'shield' as const,
+        toneStyle: styles.promoCardIdle,
+      };
+    }
+
+    if (lapsedCount) {
+      return {
+        body: `${lapsedCount} cover${lapsedCount === 1 ? '' : 's'} ${lapsedCount === 1 ? 'has' : 'have'} lapsed. Prioritize recovery, then follow up on ${dueSoonCount} due-soon cover${dueSoonCount === 1 ? '' : 's'}.`,
+        icon: 'gpp-bad' as const,
+        toneStyle: styles.promoCardAlert,
+      };
+    }
+
+    if (dueSoonCount) {
+      return {
+        body: `${dueSoonCount} cover${dueSoonCount === 1 ? '' : 's'} ${dueSoonCount === 1 ? 'is' : 'are'} due soon and ${activeCount} ${activeCount === 1 ? 'is' : 'are'} active. Reach out early to improve renewal conversion.`,
+        icon: 'event-available' as const,
+        toneStyle: styles.promoCardWarm,
+      };
+    }
+
+    return {
+      body: `All ${activeCount} cover${activeCount === 1 ? '' : 's'} ${activeCount === 1 ? 'is' : 'are'} currently active with no urgent renewals. Your book looks healthy right now.`,
+      icon: 'verified-user' as const,
+      toneStyle: styles.promoCardHealthy,
+    };
+  }, [activeCount, covers.length, dueSoonCount, lapsedCount]);
 
   const loadCovers = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -487,45 +417,6 @@ export default function CoversScreen() {
     return <Redirect href="/billing" />;
   }
 
-  function updateForm<K extends keyof CreateCoverForm>(key: K, value: CreateCoverForm[K]) {
-    setCoverForm((current) => ({ ...current, [key]: value }));
-  }
-
-  function markTouched(field: keyof CreateCoverTouched) {
-    setCoverTouched((current) => ({ ...current, [field]: true }));
-  }
-
-  function getFieldError(field: keyof CreateCoverTouched) {
-    return coverTouched[field] ? formErrors[field] : '';
-  }
-
-  function openDatePicker() {
-    const source = coverForm.expiryDate && /^\d{4}-\d{2}-\d{2}$/.test(coverForm.expiryDate)
-      ? new Date(`${coverForm.expiryDate}T00:00:00`)
-      : new Date();
-    setPickerMonth(new Date(source.getFullYear(), source.getMonth(), 1));
-    setDatePickerOpen(true);
-    markTouched('expiryDate');
-  }
-
-  function populateFormFromCover(cover: CoverRecord) {
-    setCoverForm({
-      allowPushNotif: cover.allowPushNotif,
-      currency: cover.currency,
-      customerIdentifier: cover.customerIdentifier,
-      cycle: cover.cycle,
-      email: cover.email ?? '',
-      expiryDate: cover.expiryDate,
-      insurancePremium: String(cover.insurancePremium),
-      insuranceProduct: cover.insuranceProduct,
-      insuranceProvider: cover.insuranceProvider,
-      phone: cover.phone ?? '',
-      policyNumber: cover.policyNumber ?? '',
-      vehicleReg: cover.vehicleReg ?? '',
-    });
-    setCoverTouched(INITIAL_TOUCHED);
-  }
-
   async function fetchCoverDetail(coverId: string) {
     if (!session?.accessToken) {
       return null;
@@ -553,6 +444,11 @@ export default function CoversScreen() {
       return;
     }
 
+    if (key === 'contracts') {
+      router.push('/contracts');
+      return;
+    }
+
     if (key === 'covers') {
       return;
     }
@@ -563,7 +459,19 @@ export default function CoversScreen() {
     }
 
     setMoreMenuOpen(false);
-    Alert.alert(key === 'tasks' ? 'Tasks' : 'Contracts', 'This workspace can be connected next.');
+    setInfoModal({
+      eyebrow: 'Workspace',
+      message: 'This workspace can be connected next.',
+      title: 'Tasks',
+      visible: true,
+    });
+  }
+
+  function closeInfoModal() {
+    setInfoModal((current) => ({
+      ...current,
+      visible: false,
+    }));
   }
 
   function handleLogout() {
@@ -572,16 +480,15 @@ export default function CoversScreen() {
   }
 
   function handleOpenCreate() {
-    setEditorMode('create');
-    setSelectedCoverId(null);
-    setSelectedCoverDetail(null);
-    setCoverForm(INITIAL_FORM);
-    setCoverTouched(INITIAL_TOUCHED);
-    setCreateModalOpen(true);
+    router.push('/cover-form');
   }
 
-  function handleCoverPress(coverId: string) {
+  function handleCoverPress(coverId: string, event: GestureResponderEvent) {
+    const maxTop = Math.max(112, height - ACTION_MENU_HEIGHT - 112);
     setSelectedCoverId(coverId);
+    setActionMenuPosition({
+      top: Math.min(maxTop, Math.max(112, event.nativeEvent.pageY - 6)),
+    });
     setCoverActionMenuOpen(true);
   }
 
@@ -604,77 +511,15 @@ export default function CoversScreen() {
     }
 
     setCoverActionMenuOpen(false);
-    const cover = await fetchCoverDetail(selectedCoverId);
-
-    if (cover) {
-      populateFormFromCover(cover);
-      setEditorMode('edit');
-      setCreateModalOpen(true);
-    }
+    router.push({
+      params: { id: selectedCoverId, mode: 'edit' },
+      pathname: '/cover-form',
+    });
   }
 
   function handleDeletePrompt() {
     setCoverActionMenuOpen(false);
     setDeleteConfirmOpen(true);
-  }
-
-  async function handleCreateCover() {
-    if (!canSubmitForm) {
-      setCoverTouched({
-        customerIdentifier: true,
-        cycle: true,
-        email: true,
-        expiryDate: true,
-        insurancePremium: true,
-        insuranceProduct: true,
-        insuranceProvider: true,
-      });
-      return;
-    }
-
-    const validationMessage = validateCreateForm(coverForm);
-
-    if (validationMessage) {
-      showToast(validationMessage, 'error');
-      return;
-    }
-
-    setCreateSubmitting(true);
-
-    try {
-      const payload = {
-        allowPushNotif: coverForm.allowPushNotif,
-        currency: coverForm.currency.trim().toUpperCase() || 'KES',
-        customerIdentifier: coverForm.customerIdentifier.trim(),
-        cycle: coverForm.cycle,
-        email: coverForm.email.trim() || undefined,
-        expiryDate: coverForm.expiryDate.trim(),
-        insurancePremium: Number(coverForm.insurancePremium),
-        insuranceProduct: coverForm.insuranceProduct.trim(),
-        insuranceProvider: coverForm.insuranceProvider.trim(),
-        phone: coverForm.phone.trim() || undefined,
-        policyNumber: coverForm.policyNumber.trim() || undefined,
-        vehicleReg: coverForm.vehicleReg.trim() || undefined,
-      };
-
-      const savedCover =
-        editorMode === 'edit' && selectedCoverId
-          ? await updateCover(session.accessToken, selectedCoverId, payload)
-          : await createCover(session.accessToken, payload);
-
-      setCreateModalOpen(false);
-      setSelectedCoverDetail(savedCover);
-      setCoverForm(INITIAL_FORM);
-      setCoverTouched(INITIAL_TOUCHED);
-      showToast(editorMode === 'edit' ? 'Cover updated successfully.' : 'Cover created successfully.');
-      await loadCovers({ silent: true });
-    } catch (error) {
-      if (!(error instanceof UnauthorizedError)) {
-        showToast(error instanceof Error ? error.message : 'Unable to create cover.', 'error');
-      }
-    } finally {
-      setCreateSubmitting(false);
-    }
   }
 
   async function handleDeleteCover() {
@@ -731,6 +576,7 @@ export default function CoversScreen() {
 
     try {
       await markCyclePaid(session.accessToken, coverId);
+      setNotificationConfirm({ coverId: null, kind: null, visible: false });
       showToast('Cycle marked as paid.');
       await loadCovers({ silent: true });
     } catch (error) {
@@ -751,6 +597,7 @@ export default function CoversScreen() {
 
     try {
       await markExpiryComplete(session.accessToken, coverId);
+      setNotificationConfirm({ coverId: null, kind: null, visible: false });
       showToast('Cover expiry marked as complete.');
       await loadCovers({ silent: true });
     } catch (error) {
@@ -762,6 +609,39 @@ export default function CoversScreen() {
     }
   }
 
+  function openNotificationConfirm(coverId: string, kind: NotificationActionKind) {
+    setNotificationConfirm({
+      coverId,
+      kind,
+      visible: true,
+    });
+  }
+
+  function closeNotificationConfirm() {
+    if (notificationConfirmBusy) {
+      return;
+    }
+
+    setNotificationConfirm({
+      coverId: null,
+      kind: null,
+      visible: false,
+    });
+  }
+
+  async function handleConfirmNotificationAction() {
+    if (!notificationConfirm.coverId || !notificationConfirm.kind) {
+      return;
+    }
+
+    if (notificationConfirm.kind === 'cycle') {
+      await handleMarkCyclePaid(notificationConfirm.coverId);
+      return;
+    }
+
+    await handleMarkExpiryComplete(notificationConfirm.coverId);
+  }
+
   return (
     <>
       <FloatingPageShell
@@ -769,7 +649,14 @@ export default function CoversScreen() {
         bottomSlot={<FloatingBottomNav activeKey={moreMenuOpen ? 'more' : 'covers'} onPress={handleBottomNavPress} />}
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() => setNotificationsOpen(true)}
-        onProfilePress={() => Alert.alert('Account', `Signed in as ${session.email}`)}
+        onProfilePress={() =>
+          setInfoModal({
+            eyebrow: 'Account',
+            message: `Signed in as ${session.email}`,
+            title: 'Account',
+            visible: true,
+          })
+        }
         profileImageUrl={session.profileImageUrl}
         refreshControl={
           <RefreshControl
@@ -777,7 +664,12 @@ export default function CoversScreen() {
             onRefresh={() => loadCovers()}
           />
         }
-        scrollViewProps={{ onScrollBeginDrag: () => setMoreMenuOpen(false) }}
+        scrollViewProps={{
+          onScrollBeginDrag: () => {
+            setMoreMenuOpen(false);
+            setCoverActionMenuOpen(false);
+          },
+        }}
         title="Covers">
         <View style={styles.heroSection}>
           <View style={styles.heroHeaderRow}>
@@ -796,23 +688,17 @@ export default function CoversScreen() {
 
         <View style={styles.summaryGrid}>
           {coverSummaryCards.map((card) => (
-            <Pressable
+            <SummaryCard
+              active={coverFilter === card.filter}
               key={card.title}
-              style={[
-                styles.summaryCard,
-                { width: cardWidth },
-                coverFilter === card.filter ? styles.summaryCardActive : null,
-              ]}
-              onPress={() => setCoverFilter(card.filter)}>
-              <View style={styles.summaryHeader}>
-                <View style={[styles.summaryIconWrap, iconToneStyles[card.iconTone]]}>
-                  <MaterialIcons color={iconToneColors[card.iconTone]} name={card.icon} size={26} />
-                </View>
-                <Text style={styles.summaryCount}>{card.count}</Text>
-              </View>
-              <Text style={styles.summaryLabel}>{card.label}</Text>
-              <Text style={styles.summaryTitle}>{card.title}</Text>
-            </Pressable>
+              count={card.count}
+              icon={card.icon}
+              iconTone={card.iconTone}
+              label={card.label}
+              style={{ width: cardWidth }}
+              title={card.title}
+              onPress={() => setCoverFilter(card.filter)}
+            />
           ))}
         </View>
 
@@ -846,7 +732,7 @@ export default function CoversScreen() {
                 <Pressable
                   key={cover.id}
                   style={[styles.coverRow, index < filteredListItems.length - 1 ? styles.coverRowBorder : null]}
-                  onPress={() => handleCoverPress(cover.id)}>
+                  onPress={(event) => handleCoverPress(cover.id, event)}>
                   <View style={styles.coverRowLeft}>
                     <View
                       style={[
@@ -903,68 +789,46 @@ export default function CoversScreen() {
           </View>
         </View>
 
-        <View style={styles.promoCard}>
+        <View style={[styles.promoCard, readinessInsight.toneStyle]}>
           <View style={styles.promoCopy}>
             <Text style={styles.promoTitle}>Renewal Readiness</Text>
-            <Text style={styles.promoBody}>
-              {dueSoonCount
-                ? `You have ${dueSoonCount} cover${dueSoonCount === 1 ? '' : 's'} due soon. Reach out early to improve renewal conversion.`
-                : 'No covers are currently due soon. New records will show up here as renewals approach.'}
-            </Text>
+            <Text style={styles.promoBody}>{readinessInsight.body}</Text>
           </View>
-          <MaterialIcons color="rgba(255,255,255,0.2)" name="shield" size={120} style={styles.promoIcon} />
+          <MaterialIcons color="rgba(255,255,255,0.2)" name={readinessInsight.icon} size={120} style={styles.promoIcon} />
         </View>
       </FloatingPageShell>
 
-      <AppModal
-        footer={
-          <Pressable style={[styles.modalButton, styles.modalButtonOutline]} onPress={() => setCoverActionMenuOpen(false)}>
-            <Text style={[styles.modalButtonText, styles.modalButtonTextOutline]}>Cancel</Text>
-          </Pressable>
-        }
-        frameStyle={styles.actionMenuFrame}
-        title="Cover actions"
-        visible={coverActionMenuOpen}
-        onClose={() => setCoverActionMenuOpen(false)}>
-        <View style={styles.actionMenuList}>
-          <Pressable style={styles.actionMenuItem} onPress={handleViewCover}>
-            <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
-              <MaterialIcons color={palette.primary} name="visibility" size={18} />
-            </View>
-            <View style={styles.actionMenuCopy}>
+      {coverActionMenuOpen ? (
+        <>
+          <Pressable style={styles.actionMenuBackdrop} onPress={() => setCoverActionMenuOpen(false)} />
+          <View style={[styles.actionMenu, { top: actionMenuPosition.top }]}>
+            <Pressable style={styles.actionMenuItem} onPress={handleViewCover}>
+              <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
+                <MaterialIcons color={palette.primary} name="visibility" size={18} />
+              </View>
               <Text style={styles.actionMenuTitle}>View</Text>
-              <Text style={styles.actionMenuBody}>Open full cover details</Text>
-            </View>
-          </Pressable>
-          <Pressable style={styles.actionMenuItem} onPress={handleViewTimeline}>
-            <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
-              <MaterialIcons color={palette.primary} name="history" size={18} />
-            </View>
-            <View style={styles.actionMenuCopy}>
+            </Pressable>
+            <Pressable style={styles.actionMenuItem} onPress={handleViewTimeline}>
+              <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
+                <MaterialIcons color={palette.primary} name="history" size={18} />
+              </View>
               <Text style={styles.actionMenuTitle}>Timeline</Text>
-              <Text style={styles.actionMenuBody}>View payment history</Text>
-            </View>
-          </Pressable>
-          <Pressable style={styles.actionMenuItem} onPress={handleEditCover}>
-            <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
-              <MaterialIcons color={palette.primary} name="edit" size={18} />
-            </View>
-            <View style={styles.actionMenuCopy}>
+            </Pressable>
+            <Pressable style={styles.actionMenuItem} onPress={handleEditCover}>
+              <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
+                <MaterialIcons color={palette.primary} name="edit" size={18} />
+              </View>
               <Text style={styles.actionMenuTitle}>Edit</Text>
-              <Text style={styles.actionMenuBody}>Update this cover record</Text>
-            </View>
-          </Pressable>
-          <Pressable style={styles.actionMenuItem} onPress={handleDeletePrompt}>
-            <View style={[styles.actionMenuIconWrap, styles.actionMenuIconDanger]}>
-              <MaterialIcons color={palette.error} name="delete-outline" size={18} />
-            </View>
-            <View style={styles.actionMenuCopy}>
+            </Pressable>
+            <Pressable style={styles.actionMenuItem} onPress={handleDeletePrompt}>
+              <View style={[styles.actionMenuIconWrap, styles.actionMenuIconDanger]}>
+                <MaterialIcons color={palette.error} name="delete-outline" size={18} />
+              </View>
               <Text style={styles.actionMenuTitle}>Delete</Text>
-              <Text style={styles.actionMenuBody}>Remove this cover permanently</Text>
-            </View>
-          </Pressable>
-        </View>
-      </AppModal>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
 
       <AppModal
         footer={
@@ -1102,178 +966,6 @@ export default function CoversScreen() {
       </AppModal>
 
       <AppModal
-        eyebrow={editorMode === 'edit' ? 'Update policy' : 'New policy'}
-        footer={
-          <View style={styles.modalFooter}>
-            <Pressable
-              style={[styles.modalButton, styles.modalButtonOutline, createSubmitting ? styles.modalButtonDisabled : null]}
-              disabled={createSubmitting}
-              onPress={() => {
-                setCreateModalOpen(false);
-                setCoverForm(INITIAL_FORM);
-                setCoverTouched(INITIAL_TOUCHED);
-              }}>
-              <Text style={[styles.modalButtonText, styles.modalButtonTextOutline]}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.modalButton, !canSubmitForm || createSubmitting ? styles.modalButtonDisabled : null]}
-              disabled={!canSubmitForm || createSubmitting}
-              onPress={handleCreateCover}>
-              {createSubmitting ? (
-                <ActivityIndicator color={palette.onPrimary} size="small" />
-              ) : (
-                <Text style={styles.modalButtonText}>{editorMode === 'edit' ? 'Save changes' : 'Create cover'}</Text>
-              )}
-            </Pressable>
-          </View>
-        }
-        frameStyle={styles.createModalFrame}
-        title={editorMode === 'edit' ? 'Edit cover' : 'Add cover'}
-        visible={createModalOpen}
-        onClose={() => {
-          if (!createSubmitting) {
-            setCreateModalOpen(false);
-          }
-        }}>
-        <Text style={styles.modalIntro}>
-          {editorMode === 'edit'
-            ? 'Update the policy details below to keep this cover record accurate.'
-            : 'Enter the policy details below to create a new cover record.'}
-        </Text>
-        <View style={styles.formStack}>
-          <View style={styles.modalSection}>
-            <Text style={styles.modalSectionTitle}>Customer Details</Text>
-            <AuthTextField
-              autoCapitalize="words"
-              error={getFieldError('customerIdentifier')}
-              icon="person-outline"
-              label="Customer Identifier"
-              placeholder="Customer name or reference"
-              value={coverForm.customerIdentifier}
-              onBlur={() => markTouched('customerIdentifier')}
-              onChangeText={(value) => updateForm('customerIdentifier', value)}
-            />
-            <AuthTextField
-              error={getFieldError('email')}
-              icon="mail-outline"
-              keyboardType="email-address"
-              label="Email"
-              optionalLabel="(Optional)"
-              placeholder="customer@example.com"
-              value={coverForm.email}
-              onBlur={() => markTouched('email')}
-              onChangeText={(value) => updateForm('email', value)}
-            />
-            <AuthTextField
-              icon="phone"
-              keyboardType="phone-pad"
-              label="Phone"
-              optionalLabel="(Optional)"
-              placeholder="+254700000000"
-              value={coverForm.phone}
-              onChangeText={(value) => updateForm('phone', value)}
-            />
-          </View>
-          <View style={styles.modalSection}>
-            <Text style={styles.modalSectionTitle}>Cover Details</Text>
-            <AuthTextField
-              autoCapitalize="words"
-              error={getFieldError('insuranceProvider')}
-              icon="business"
-              label="Insurance Provider"
-              placeholder="APA Insurance"
-              value={coverForm.insuranceProvider}
-              onBlur={() => markTouched('insuranceProvider')}
-              onChangeText={(value) => updateForm('insuranceProvider', value)}
-            />
-            <AuthTextField
-              autoCapitalize="words"
-              error={getFieldError('insuranceProduct')}
-              icon="shield"
-              label="Insurance Product"
-              placeholder="Motor Comprehensive"
-              value={coverForm.insuranceProduct}
-              onBlur={() => markTouched('insuranceProduct')}
-              onChangeText={(value) => updateForm('insuranceProduct', value)}
-            />
-            <AuthTextField
-              autoCapitalize="characters"
-              icon="payments"
-              label="Currency"
-              optionalLabel="(Optional)"
-              placeholder="KES"
-              value={coverForm.currency}
-              onChangeText={(value) => updateForm('currency', value)}
-            />
-            <AuthTextField
-              error={getFieldError('insurancePremium')}
-              icon="attach-money"
-              keyboardType="numeric"
-              label="Premium"
-              placeholder="15000"
-              value={coverForm.insurancePremium}
-              onBlur={() => markTouched('insurancePremium')}
-              onChangeText={(value) => updateForm('insurancePremium', value)}
-            />
-            <AuthTextField
-              autoCapitalize="characters"
-              icon="event"
-              error={getFieldError('expiryDate')}
-              label="Expiry date"
-              placeholder="2026-12-31"
-              value={coverForm.expiryDate}
-              onFocus={openDatePicker}
-              showSoftInputOnFocus={false}
-            />
-            <SelectTrigger
-              error={getFieldError('cycle')}
-              label="Cycle"
-              value={coverForm.cycle === 'MONTHLY' ? 'Monthly' : 'Annual'}
-              onPress={() => {
-                setCyclePickerOpen(true);
-                markTouched('cycle');
-              }}
-            />
-            <AuthTextField
-              autoCapitalize="characters"
-              icon="directions-car"
-              label="Vehicle reg"
-              optionalLabel="(Optional)"
-              placeholder="KDA 123A"
-              value={coverForm.vehicleReg}
-              onChangeText={(value) => updateForm('vehicleReg', value)}
-            />
-            <AuthTextField
-              autoCapitalize="characters"
-              icon="badge"
-              label="Policy number"
-              optionalLabel="(Optional)"
-              placeholder="POL-001"
-              value={coverForm.policyNumber}
-              onChangeText={(value) => updateForm('policyNumber', value)}
-            />
-          </View>
-          <View style={styles.modalSection}>
-            <Text style={styles.modalSectionTitle}>Notifications</Text>
-            <Pressable style={styles.switchRow} onPress={() => updateForm('allowPushNotif', !coverForm.allowPushNotif)}>
-              <View style={styles.switchCopy}>
-                <Text style={styles.switchTitle}>Allow notifications</Text>
-                <Text style={styles.switchSubtitle}>Keep reminder notifications enabled for this cover.</Text>
-              </View>
-              <View style={[styles.switchPill, coverForm.allowPushNotif ? styles.switchPillActive : null]}>
-                <View
-                  style={[
-                    styles.switchThumb,
-                    coverForm.allowPushNotif ? styles.switchThumbActive : null,
-                  ]}
-                />
-              </View>
-            </Pressable>
-          </View>
-        </View>
-      </AppModal>
-
-      <AppModal
         footer={
           <Pressable style={styles.modalButton} onPress={() => setNotificationsOpen(false)}>
             <Text style={styles.modalButtonText}>Close</Text>
@@ -1309,7 +1001,7 @@ export default function CoversScreen() {
                     disabled={markingPaidId === item.id}
                     hitSlop={8}
                     style={[styles.markPaidButton, markingPaidId === item.id ? styles.markPaidButtonDisabled : null]}
-                    onPress={() => handleMarkCyclePaid(item.id)}>
+                    onPress={() => openNotificationConfirm(item.id, 'cycle')}>
                     {markingPaidId === item.id ? (
                       <ActivityIndicator color={palette.primary} size="small" />
                     ) : (
@@ -1346,7 +1038,7 @@ export default function CoversScreen() {
                     disabled={markingExpiryCompleteId === item.id}
                     hitSlop={8}
                     style={[styles.markPaidButton, markingExpiryCompleteId === item.id ? styles.markPaidButtonDisabled : null]}
-                    onPress={() => handleMarkExpiryComplete(item.id)}>
+                    onPress={() => openNotificationConfirm(item.id, 'expiry')}>
                     {markingExpiryCompleteId === item.id ? (
                       <ActivityIndicator color={palette.tertiary} size="small" />
                     ) : (
@@ -1366,114 +1058,92 @@ export default function CoversScreen() {
 
       <AppModal
         footer={
-          <Pressable style={styles.modalButton} onPress={() => setCyclePickerOpen(false)}>
-            <Text style={styles.modalButtonText}>Done</Text>
-          </Pressable>
-        }
-        frameStyle={styles.cycleModalFrame}
-        title="Select cycle"
-        visible={cyclePickerOpen}
-        onClose={() => setCyclePickerOpen(false)}>
-        <View style={styles.cycleOptions}>
-          {[
-            { label: 'Monthly', value: 'MONTHLY' as const },
-            { label: 'Annual', value: 'ANNUAL' as const },
-          ].map((option) => (
-            <Pressable
-              key={option.value}
-              style={[styles.cycleOption, coverForm.cycle === option.value ? styles.cycleOptionActive : null]}
-              onPress={() => {
-                updateForm('cycle', option.value);
-                markTouched('cycle');
-                setCyclePickerOpen(false);
-              }}>
-              <View style={styles.cycleOptionCopy}>
-                <Text style={styles.cycleOptionTitle}>{option.label}</Text>
-                <Text style={styles.cycleOptionBody}>
-                  {option.value === 'MONTHLY' ? 'Track monthly premium follow-ups.' : 'Track annual renewal dates.'}
-                </Text>
-              </View>
-              {coverForm.cycle === option.value ? (
-                <MaterialIcons color={palette.primary} name="check-circle" size={22} />
-              ) : null}
-            </Pressable>
-          ))}
-        </View>
-      </AppModal>
-
-      <AppModal
-        footer={
           <View style={styles.modalFooter}>
-            <Pressable style={[styles.modalButton, styles.modalButtonOutline]} onPress={() => setDatePickerOpen(false)}>
+            <Pressable
+              style={[styles.modalButton, styles.modalButtonOutline, notificationConfirmBusy ? styles.modalButtonDisabled : null]}
+              disabled={notificationConfirmBusy}
+              onPress={closeNotificationConfirm}>
               <Text style={[styles.modalButtonText, styles.modalButtonTextOutline]}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.modalButton, notificationConfirmBusy ? styles.modalButtonDisabled : null]}
+              disabled={notificationConfirmBusy || !notificationConfirmCover}
+              onPress={handleConfirmNotificationAction}>
+              {notificationConfirmBusy ? (
+                <ActivityIndicator
+                  color={notificationConfirm.kind === 'expiry' ? palette.onPrimary : palette.onPrimary}
+                  size="small"
+                />
+              ) : (
+                <Text style={styles.modalButtonText}>
+                  {notificationConfirm.kind === 'cycle' ? 'Mark as paid' : 'Mark as complete'}
+                </Text>
+              )}
             </Pressable>
           </View>
         }
-        frameStyle={styles.dateModalFrame}
-        title="Select expiry date"
-        visible={datePickerOpen}
-        onClose={() => setDatePickerOpen(false)}>
-        <View style={styles.calendarHeader}>
-          <Pressable
-            style={styles.calendarNavButton}
-            onPress={() => setPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
-            <MaterialIcons color={palette.primary} name="chevron-left" size={22} />
-          </Pressable>
-          <Text style={styles.calendarTitle}>
-            {pickerMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
-          </Text>
-          <Pressable
-            style={styles.calendarNavButton}
-            onPress={() => setPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>
-            <MaterialIcons color={palette.primary} name="chevron-right" size={22} />
-          </Pressable>
-        </View>
-
-        <View style={styles.calendarWeekdays}>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <Text key={day} style={styles.calendarWeekday}>
-              {day}
+        frameStyle={styles.deleteModalFrame}
+        title={notificationConfirm.kind === 'cycle' ? 'Confirm cycle payment' : 'Confirm expiry completion'}
+        visible={notificationConfirm.visible}
+        onClose={closeNotificationConfirm}>
+        {notificationConfirmCover ? (
+          <View style={styles.detailList}>
+            <Text style={styles.modalIntro}>
+              {notificationConfirm.kind === 'cycle'
+                ? 'Confirm that this monthly cycle has been paid before we update the cover record.'
+                : 'Confirm that this cover expiry has been completed before we update the notification status.'}
             </Text>
-          ))}
-        </View>
-
-        <View style={styles.calendarGrid}>
-          {buildCalendarDays(pickerMonth).map((day, index) => {
-            const iso = day ? formatDateIso(day) : null;
-            const selected = iso === coverForm.expiryDate;
-            const tomorrow = new Date();
-            tomorrow.setHours(0, 0, 0, 0);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const isPast = day ? day < tomorrow : false;
-            const isDisabled = !day || isPast;
-
-            return (
-              <Pressable
-                key={iso ?? `empty-${index}`}
-                disabled={isDisabled}
+            <View style={styles.detailHeaderCard}>
+              <View
                 style={[
-                  styles.calendarDay,
-                  !day ? styles.calendarDayEmpty : null,
-                  isPast ? styles.calendarDayPast : null,
-                  selected ? styles.calendarDaySelected : null,
-                ]}
-                onPress={() => {
-                  updateForm('expiryDate', formatDateIso(day!));
-                  setDatePickerOpen(false);
-                }}>
-                <Text
-                  style={[
-                    styles.calendarDayText,
-                    !day ? styles.calendarDayTextEmpty : null,
-                    isPast ? styles.calendarDayTextPast : null,
-                    selected ? styles.calendarDayTextSelected : null,
-                  ]}>
-                  {day ? day.getDate() : ''}
+                  styles.notificationIconWrap,
+                  notificationConfirm.kind === 'cycle' ? styles.notificationIconWrapPrimary : styles.notificationIconWrapTertiary,
+                ]}>
+                <MaterialIcons
+                  color={notificationConfirm.kind === 'cycle' ? palette.primary : palette.tertiary}
+                  name={notificationConfirm.kind === 'cycle' ? 'autorenew' : 'event'}
+                  size={20}
+                />
+              </View>
+              <View style={styles.detailHeaderCopy}>
+                <Text style={styles.detailHeaderTitle}>{notificationConfirmCover.customerIdentifier}</Text>
+                <Text style={styles.detailHeaderMeta}>
+                  {notificationConfirmCover.insuranceProvider} • {notificationConfirmCover.insuranceProduct}
                 </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+              </View>
+              <View
+                style={[
+                  styles.coverStatusPill,
+                  getCoverStatus(notificationConfirmCover) === 'ACTIVE'
+                    ? styles.coverStatusPillActive
+                    : getCoverStatus(notificationConfirmCover) === 'DUE'
+                      ? styles.coverStatusPillDue
+                      : styles.coverStatusPillLapsed,
+                ]}>
+                <Text style={styles.coverStatusText}>{getCoverStatus(notificationConfirmCover)}</Text>
+              </View>
+            </View>
+            <DetailRow
+              label={notificationConfirm.kind === 'cycle' ? 'Next due date' : 'Expiry date'}
+              value={formatLongDate(
+                notificationConfirm.kind === 'cycle'
+                  ? notificationConfirmCover.nextDueDate ?? notificationConfirmCover.expiryDate
+                  : notificationConfirmCover.expiryDate
+              )}
+            />
+            <DetailRow label="Cycle" value={notificationConfirmCover.cycle} />
+            <DetailRow
+              label="Premium"
+              value={`${notificationConfirmCover.currency} ${Number(notificationConfirmCover.insurancePremium).toLocaleString()}`}
+            />
+            <DetailRow label="Policy number" value={notificationConfirmCover.policyNumber ?? 'Not provided'} />
+            <DetailRow label="Vehicle reg" value={notificationConfirmCover.vehicleReg ?? 'Not provided'} />
+          </View>
+        ) : (
+          <View style={styles.modalLoadingState}>
+            <Text style={styles.modalLoadingText}>No cover details available.</Text>
+          </View>
+        )}
       </AppModal>
 
       {moreMenuOpen ? (
@@ -1484,7 +1154,12 @@ export default function CoversScreen() {
               style={styles.moreMenuItem}
               onPress={() => {
                 setMoreMenuOpen(false);
-                Alert.alert('Support', 'Support workspace can be connected next.');
+                setInfoModal({
+                  eyebrow: 'Support',
+                  message: 'Support workspace can be connected next.',
+                  title: 'Support',
+                  visible: true,
+                });
               }}>
               <View style={styles.moreMenuIconWrap}>
                 <MaterialIcons color={palette.primary} name="contact-support" size={20} />
@@ -1520,27 +1195,14 @@ export default function CoversScreen() {
           </View>
         </>
       ) : null}
+      <AppMessageModal
+        eyebrow={infoModal.eyebrow}
+        message={infoModal.message}
+        title={infoModal.title}
+        visible={infoModal.visible}
+        onClose={closeInfoModal}
+      />
     </>
-  );
-}
-
-type SelectTriggerProps = {
-  error?: string;
-  label: string;
-  onPress: () => void;
-  value: string;
-};
-
-function SelectTrigger({ error, label, onPress, value }: SelectTriggerProps) {
-  return (
-    <View style={styles.selectBlock}>
-      <Text style={[styles.selectLabel, error ? styles.selectLabelError : null]}>{label}</Text>
-      <Pressable style={[styles.selectShell, error ? styles.selectShellError : null]} onPress={onPress}>
-        <Text style={styles.selectValue}>{value}</Text>
-        <MaterialIcons color={palette.onSurfaceVariant} name="keyboard-arrow-down" size={20} />
-      </Pressable>
-      {error ? <Text style={styles.selectError}>{error}</Text> : null}
-    </View>
   );
 }
 
@@ -1554,17 +1216,26 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  actionMenuBody: {
-    color: palette.onSurfaceVariant,
-    fontSize: typography.bodySmall,
+  actionMenu: {
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderColor: 'rgba(0,92,171,0.08)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    minWidth: 156,
+    padding: 6,
+    position: 'absolute',
+    right: spacing.marginMobile,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    zIndex: 50,
   },
-  actionMenuCopy: {
-    flex: 1,
-    gap: 2,
+  actionMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+    zIndex: 40,
   },
-  actionMenuFrame: {
-    maxWidth: 360,
-  } as ViewStyle,
   actionMenuIconDanger: {
     backgroundColor: 'rgba(186, 26, 26, 0.1)',
   },
@@ -1574,26 +1245,26 @@ const styles = StyleSheet.create({
   actionMenuIconWrap: {
     alignItems: 'center',
     borderRadius: radius.pill,
-    height: 36,
+    height: 30,
     justifyContent: 'center',
-    width: 36,
+    width: 30,
   },
   actionMenuItem: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.52)',
-    borderColor: 'rgba(192, 199, 214, 0.55)',
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(192, 199, 214, 0.4)',
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  actionMenuList: {
-    gap: spacing.sm,
+    gap: 10,
+    minHeight: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   actionMenuTitle: {
     color: palette.onSurface,
-    fontSize: typography.body,
+    flex: 1,
+    fontSize: typography.label,
     fontWeight: '700',
   },
   addButton: {
@@ -2096,6 +1767,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: spacing.lg,
   },
+  promoCardAlert: {
+    backgroundColor: palette.tertiaryContainer,
+  },
+  promoCardHealthy: {
+    backgroundColor: '#0F766E',
+  },
+  promoCardIdle: {
+    backgroundColor: palette.primaryContainer,
+  },
+  promoCardWarm: {
+    backgroundColor: '#B45309',
+  },
   promoCopy: {
     gap: spacing.xs,
     zIndex: 1,
@@ -2169,30 +1852,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
-  summaryCard: {
-    backgroundColor: palette.surfaceContainerLowest,
-    borderColor: 'rgba(255,255,255,0.4)',
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    elevation: 8,
-    height: 144,
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-    padding: spacing.md,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-  },
-  summaryCardActive: {
-    borderColor: palette.primary,
-    borderWidth: 2,
-  },
-  summaryCount: {
-    color: palette.onSurface,
-    fontSize: 20,
-    fontWeight: '700',
-  },
   summaryGrid: {
     columnGap: spacing.md,
     flexDirection: 'row',
@@ -2200,30 +1859,6 @@ const styles = StyleSheet.create({
     marginTop: -4,
     paddingHorizontal: spacing.marginMobile,
     rowGap: spacing.md,
-  },
-  summaryHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryIconWrap: {
-    alignItems: 'center',
-    borderRadius: radius.xl,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  summaryLabel: {
-    color: palette.onSurfaceVariant,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  summaryTitle: {
-    color: palette.onSurface,
-    fontSize: 20,
-    fontWeight: '600',
   },
   switchCopy: {
     flex: 1,

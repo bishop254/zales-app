@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   trend: {
-    color: palette.success,
+    color: '#15803D',
     fontSize: typography.bodySmall,
     fontWeight: '700',
   },

@@ -1,7 +1,6 @@
 import { Link, router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
-  Alert,
   Platform,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
+import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AppLogo } from '@/components/app/app-logo';
 import {
   AuthBackground,
@@ -49,6 +49,14 @@ type TouchedFields = {
   referralCode: boolean;
 };
 
+type FeedbackModalState = {
+  eyebrow: string;
+  message: string;
+  title: string;
+  tone: 'error' | 'info';
+  visible: boolean;
+};
+
 export default function RegisterScreen() {
   const { loginWithGoogle, register } = useAuth();
   const { showToast } = useToast();
@@ -63,6 +71,13 @@ export default function RegisterScreen() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState<FeedbackModalState>({
+    eyebrow: '',
+    message: '',
+    title: '',
+    tone: 'info',
+    visible: false,
+  });
   const [touched, setTouched] = useState<TouchedFields>({
     acceptedTerms: false,
     countryOfResidence: false,
@@ -112,6 +127,28 @@ export default function RegisterScreen() {
     return touched[field] ? errors[field] : '';
   }
 
+  function openFeedbackModal({
+    eyebrow,
+    message,
+    title,
+    tone,
+  }: Omit<FeedbackModalState, 'visible'>) {
+    setFeedbackModal({
+      eyebrow,
+      message,
+      title,
+      tone,
+      visible: true,
+    });
+  }
+
+  function closeFeedbackModal() {
+    setFeedbackModal((current) => ({
+      ...current,
+      visible: false,
+    }));
+  }
+
   async function handleRegister() {
     if (!canSubmit || submitting) {
       setTouched({
@@ -148,7 +185,12 @@ export default function RegisterScreen() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Please try again.';
       showToast(message, 'error');
-      Alert.alert('Registration failed', message);
+      openFeedbackModal({
+        eyebrow: 'Registration error',
+        message,
+        title: 'Registration failed',
+        tone: 'error',
+      });
     } finally {
       if (!didNavigate) {
         setSubmitting(false);
@@ -169,7 +211,12 @@ export default function RegisterScreen() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start Google sign-in.';
       showToast(message, 'error');
-      Alert.alert('Google sign-in failed', message);
+      openFeedbackModal({
+        eyebrow: 'Google sign-in',
+        message,
+        title: 'Google sign-in failed',
+        tone: 'error',
+      });
     } finally {
       setGoogleSubmitting(false);
     }
@@ -302,6 +349,14 @@ export default function RegisterScreen() {
       <AuthBackground contentStyle={styles.registerContent} scroll={false}>
         {useSplitLayout ? <SplitAuthLayout>{content}</SplitAuthLayout> : content}
       </AuthBackground>
+      <AppMessageModal
+        eyebrow={feedbackModal.eyebrow}
+        message={feedbackModal.message}
+        title={feedbackModal.title}
+        tone={feedbackModal.tone}
+        visible={feedbackModal.visible}
+        onClose={closeFeedbackModal}
+      />
     </>
   );
 }

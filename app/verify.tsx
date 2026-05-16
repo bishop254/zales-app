@@ -1,8 +1,9 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
+import { AppMessageModal } from '@/components/app/app-message-modal';
 import {
   AuthBackground,
   AuthButton,
@@ -13,6 +14,14 @@ import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/providers/toast-provider';
 
+type FeedbackModalState = {
+  eyebrow: string;
+  message: string;
+  title: string;
+  tone: 'error' | 'info';
+  visible: boolean;
+};
+
 export default function VerifyScreen() {
   const { pendingChallenge, resendOtpChallenge, submitOtp } = useAuth();
   const { showToast } = useToast();
@@ -20,6 +29,13 @@ export default function VerifyScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(26);
+  const [feedbackModal, setFeedbackModal] = useState<FeedbackModalState>({
+    eyebrow: '',
+    message: '',
+    title: '',
+    tone: 'info',
+    visible: false,
+  });
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   const otpValue = useMemo(() => otp.join(''), [otp]);
@@ -38,6 +54,28 @@ export default function VerifyScreen() {
 
   if (!pendingChallenge || pendingChallenge.type !== 'otp') {
     return <Redirect href="/login" />;
+  }
+
+  function openFeedbackModal({
+    eyebrow,
+    message,
+    title,
+    tone,
+  }: Omit<FeedbackModalState, 'visible'>) {
+    setFeedbackModal({
+      eyebrow,
+      message,
+      title,
+      tone,
+      visible: true,
+    });
+  }
+
+  function closeFeedbackModal() {
+    setFeedbackModal((current) => ({
+      ...current,
+      visible: false,
+    }));
   }
 
   function handleChangeDigit(index: number, nextValue: string) {
@@ -75,7 +113,12 @@ export default function VerifyScreen() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to verify code.';
       showToast(message, 'error');
-      Alert.alert('Verification failed', message);
+      openFeedbackModal({
+        eyebrow: 'Verification error',
+        message,
+        title: 'Verification failed',
+        tone: 'error',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -96,7 +139,12 @@ export default function VerifyScreen() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to resend OTP.';
       showToast(message, 'error');
-      Alert.alert('Resend failed', message);
+      openFeedbackModal({
+        eyebrow: 'OTP resend',
+        message,
+        title: 'Resend failed',
+        tone: 'error',
+      });
     } finally {
       setResending(false);
     }
@@ -169,6 +217,14 @@ export default function VerifyScreen() {
           </View>
         </AuthCard>
       </AuthBackground>
+      <AppMessageModal
+        eyebrow={feedbackModal.eyebrow}
+        message={feedbackModal.message}
+        title={feedbackModal.title}
+        tone={feedbackModal.tone}
+        visible={feedbackModal.visible}
+        onClose={closeFeedbackModal}
+      />
     </>
   );
 }
