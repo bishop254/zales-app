@@ -179,16 +179,16 @@ export default function BillingScreen() {
       router.push('/covers');
       return;
     }
+    if (key === 'tasks') {
+      setMoreMenuOpen(false);
+      router.push('/tasks');
+      return;
+    }
     if (key === 'more') {
       setMoreMenuOpen((current) => !current);
       return;
     }
     setMoreMenuOpen(false);
-    openInfoModal({
-      eyebrow: 'Workspace',
-      message: 'This workspace can be connected next.',
-      title: 'Tasks',
-    });
   }
 
   function openPlanModal(plan: BillingPlan) {

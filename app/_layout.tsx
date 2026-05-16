@@ -24,8 +24,14 @@ export default function RootLayout() {
               <Stack.Screen name="verify" />
               <Stack.Screen name="dashboard" />
               <Stack.Screen name="billing" />
+              <Stack.Screen name="tasks" />
+              <Stack.Screen name="task-form" />
+              <Stack.Screen name="contracts" />
+              <Stack.Screen name="contract-form" />
               <Stack.Screen name="covers" />
               <Stack.Screen name="cover-form" />
+              <Stack.Screen name="support-tickets" />
+              <Stack.Screen name="support-ticket-form" />
             </Stack>
           </SubscriptionProvider>
         </AuthProvider>

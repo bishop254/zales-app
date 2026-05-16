@@ -581,6 +581,11 @@ export default function ContractsScreen() {
       return;
     }
 
+    if (key === 'tasks') {
+      router.push('/tasks');
+      return;
+    }
+
     if (key === 'contracts') {
       return;
     }
@@ -591,12 +596,6 @@ export default function ContractsScreen() {
     }
 
     setMoreMenuOpen(false);
-    setInfoModal({
-      eyebrow: 'Workspace',
-      message: 'This workspace can be connected next.',
-      title: 'Tasks',
-      visible: true,
-    });
   }
 
   function closeInfoModal() {

@@ -426,6 +426,7 @@ export default function SupportTicketsScreen() {
 
   function handleBottomNavPress(key: string) {
     if (key === 'home') { router.replace('/dashboard'); return; }
+    if (key === 'tasks') { router.push('/tasks'); return; }
     if (key === 'covers') { router.push('/covers'); return; }
     if (key === 'contracts') { router.push('/contracts'); return; }
     if (key === 'more') { setMoreMenuOpen((c) => !c); return; }
@@ -778,14 +779,19 @@ export default function SupportTicketsScreen() {
                     {comment.attachment ? (
                       <Pressable
                         style={styles.commentAttachRow}
-                        onPress={() =>
+                        onPress={() => {
+                          const attachment = comment.attachment;
+                          if (!attachment) {
+                            return;
+                          }
+
                           handleOpenTicketAttachment(
                             detailTicket.id,
-                            comment.attachment.fileName,
-                            comment.attachment.mimeType,
+                            attachment.fileName,
+                            attachment.mimeType,
                             `/support-tickets/${detailTicket.id}/comments/${comment.id}/attachment`,
-                          )
-                        }>
+                          );
+                        }}>
                         <MaterialIcons color={palette.onSurfaceVariant} name="attach-file" size={14} />
                         <Text style={styles.commentAttachName}>{comment.attachment.fileName}</Text>
                         <Text style={styles.commentAttachSize}>· {formatFileSize(comment.attachment.size)}</Text>

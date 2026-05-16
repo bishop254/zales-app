@@ -449,6 +449,11 @@ export default function CoversScreen() {
       return;
     }
 
+    if (key === 'tasks') {
+      router.push('/tasks');
+      return;
+    }
+
     if (key === 'covers') {
       return;
     }
@@ -459,12 +464,6 @@ export default function CoversScreen() {
     }
 
     setMoreMenuOpen(false);
-    setInfoModal({
-      eyebrow: 'Workspace',
-      message: 'This workspace can be connected next.',
-      title: 'Tasks',
-      visible: true,
-    });
   }
 
   function closeInfoModal() {

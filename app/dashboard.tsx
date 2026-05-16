@@ -25,6 +25,7 @@ import { getContracts } from '@/features/contracts/contracts-api';
 import { getCovers } from '@/features/covers/covers-api';
 import { dashboardShortcuts, recentActivity } from '@/features/dashboard/data';
 import { getSupportTickets } from '@/features/support-tickets/support-tickets-api';
+import { getTasks } from '@/features/tasks/tasks-api';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
 import { useToast } from '@/providers/toast-provider';
@@ -38,6 +39,7 @@ export default function DashboardScreen() {
   const [contractsCount, setContractsCount] = useState(0);
   const [coversCount, setCoversCount] = useState(0);
   const [ticketsCount, setTicketsCount] = useState(0);
+  const [tasksCount, setTasksCount] = useState(0);
   const { width } = useWindowDimensions();
 
   useFocusEffect(
@@ -52,17 +54,20 @@ export default function DashboardScreen() {
         setContractsCount(0);
         setCoversCount(0);
         setTicketsCount(0);
+        setTasksCount(0);
         return;
       }
 
+      const accessToken = session.accessToken;
       let active = true;
 
       async function loadDashboardCounts() {
         try {
-          const [contracts, covers, tickets] = await Promise.all([
-            getContracts(session.accessToken),
-            getCovers(session.accessToken),
-            getSupportTickets(session.accessToken),
+          const [contracts, covers, tickets, tasks] = await Promise.all([
+            getContracts(accessToken),
+            getCovers(accessToken),
+            getSupportTickets(accessToken),
+            getTasks(accessToken, { page: 1, pageSize: 1 }),
           ]);
 
           if (!active) {
@@ -72,6 +77,7 @@ export default function DashboardScreen() {
           setContractsCount(contracts.length);
           setCoversCount(covers.length);
           setTicketsCount(tickets.length);
+          setTasksCount(tasks.meta.totalItems);
         } catch (error) {
           if (!active || error instanceof UnauthorizedError) {
             return;
@@ -107,6 +113,10 @@ export default function DashboardScreen() {
       return { ...item, badge: String(ticketsCount) };
     }
 
+    if (item.title === 'Tasks' || item.icon === 'assignment') {
+      return { ...item, badge: String(tasksCount) };
+    }
+
     return item;
   });
 
@@ -140,6 +150,11 @@ export default function DashboardScreen() {
       return;
     }
 
+    if (key === 'tasks') {
+      router.push('/tasks');
+      return;
+    }
+
     if (key === 'covers') {
       router.push('/covers');
       return;
@@ -156,6 +171,11 @@ export default function DashboardScreen() {
 
     if (item.title === 'Insurance' || item.icon === 'shield') {
       router.push('/covers');
+      return;
+    }
+
+    if (item.title === 'Tasks' || item.icon === 'assignment') {
+      router.push('/tasks');
       return;
     }
 
