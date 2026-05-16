@@ -1,7 +1,8 @@
 import type { DocumentPickerAsset } from 'expo-document-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as WebBrowser from 'expo-web-browser';
 import { MaterialIcons } from '@expo/vector-icons';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -10,6 +11,7 @@ import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AppModal } from '@/components/app/app-modal';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { AuthTextField } from '@/components/auth/auth-primitives';
+import { apiConfig } from '@/constants/api';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
@@ -127,6 +129,10 @@ function formatFileSize(size?: number | null) {
   }
 
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
 function validateContractForm(form: ContractForm) {
@@ -310,12 +316,33 @@ export default function ContractFormScreen() {
   }
 
   async function handleOpenExistingFile() {
-    if (!existingFile?.url) {
+    if (!session?.accessToken || !contractId || !existingFile?.name) {
       return;
     }
 
     try {
-      await WebBrowser.openBrowserAsync(existingFile.url);
+      const downloadedFile = await File.downloadFileAsync(
+        `${apiConfig.baseUrl}/contracts/${contractId}/file`,
+        new File(Paths.cache, `${contractId}-${sanitizeFileName(existingFile.name)}`),
+        {
+          headers: {
+            Authorization: `Bearer ${session.accessToken}`,
+          },
+          idempotent: true,
+        }
+      );
+
+      const mimeType = 'application/octet-stream';
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(downloadedFile.uri, {
+          UTI: mimeType,
+          dialogTitle: existingFile.name,
+          mimeType,
+        });
+        return;
+      }
+
+      showToast('File sharing is not available on this device.', 'error');
     } catch {
       showToast('Unable to open the saved contract file.', 'error');
     }
@@ -498,9 +525,7 @@ export default function ContractFormScreen() {
                         {selectedFile
                           ? `${formatFileSize(selectedFile.size)} selected for upload`
                           : existingFile
-                            ? existingFile.url
-                              ? 'Saved contract file available to open'
-                              : 'Saved contract file attached to this record'
+                            ? 'Saved contract file attached to this record'
                             : 'Attach a PDF, image, or supporting document if needed.'}
                       </Text>
                     </View>
@@ -523,7 +548,7 @@ export default function ContractFormScreen() {
                         </Text>
                       </Pressable>
                     ) : null}
-                    {!selectedFile && existingFile?.url ? (
+                    {!selectedFile && existingFile ? (
                       <Pressable
                         style={[styles.inlineActionButton, styles.inlineActionButtonMuted]}
                         onPress={handleOpenExistingFile}>

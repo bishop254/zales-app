@@ -3,21 +3,18 @@ import type { DocumentPickerAsset } from 'expo-document-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Redirect, router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppMessageModal } from '@/components/app/app-message-modal';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
-import { AuthSelectField } from '@/components/auth/auth-primitives';
+import { AuthSelectField, AuthTextField } from '@/components/auth/auth-primitives';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
-import { type TicketCategory, type TicketPriority, createSupportTicket } from '@/features/support-tickets/support-tickets-api';
+import {
+  createSupportTicket,
+  type TicketCategory,
+  type TicketPriority,
+} from '@/features/support-tickets/support-tickets-api';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
 import { useToast } from '@/providers/toast-provider';
@@ -34,6 +31,13 @@ type TicketTouched = {
   message: boolean;
   priority: boolean;
   subject: boolean;
+};
+
+type InfoModalState = {
+  eyebrow: string;
+  message: string;
+  title: string;
+  visible: boolean;
 };
 
 const CATEGORY_OPTIONS = [
@@ -65,6 +69,13 @@ const INITIAL_TOUCHED: TicketTouched = {
   subject: false,
 };
 
+const INITIAL_INFO_MODAL: InfoModalState = {
+  eyebrow: '',
+  message: '',
+  title: '',
+  visible: false,
+};
+
 function countWords(text: string): number {
   return text.trim() ? text.trim().split(/\s+/).length : 0;
 }
@@ -84,33 +95,51 @@ export default function SupportTicketFormScreen() {
   const [touched, setTouched] = useState<TicketTouched>(INITIAL_TOUCHED);
   const [attachments, setAttachments] = useState<DocumentPickerAsset[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [infoModal, setInfoModal] = useState<InfoModalState>(INITIAL_INFO_MODAL);
 
   const avatarLetter = ((session?.name?.trim() || session?.email || '?').slice(0, 1)).toUpperCase();
 
   const subjectWordCount = useMemo(() => countWords(form.subject), [form.subject]);
   const messageWordCount = useMemo(() => countWords(form.message), [form.message]);
 
-  const errors = useMemo(() => {
-    return {
-      category: !form.category ? 'Select a category' : null,
+  const errors = useMemo(
+    () => ({
+      category: !form.category ? 'Select a category.' : null,
       message: !form.message.trim()
-        ? 'Enter your message'
+        ? 'Enter your message.'
         : messageWordCount > 50
-          ? 'Message must be 50 words or fewer'
+          ? 'Message must be 50 words or fewer.'
           : null,
-      priority: !form.priority ? 'Select a priority' : null,
+      priority: !form.priority ? 'Select a priority.' : null,
       subject: !form.subject.trim()
-        ? 'Enter a subject'
+        ? 'Enter a subject.'
         : subjectWordCount > 10
-          ? 'Subject must be 10 words or fewer'
+          ? 'Subject must be 10 words or fewer.'
           : null,
-    };
-  }, [form, subjectWordCount, messageWordCount]);
+    }),
+    [form, messageWordCount, subjectWordCount]
+  );
 
   const hasErrors = Object.values(errors).some(Boolean);
 
   if (!session) return <Redirect href="/login" />;
   if (!subscriptionLoading && !hasActiveSubscription) return <Redirect href="/billing" />;
+
+  function closeForm() {
+    router.replace('/support-tickets');
+  }
+
+  function setField<K extends keyof TicketForm>(key: K, value: TicketForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function touchField(key: keyof TicketTouched) {
+    setTouched((prev) => ({ ...prev, [key]: true }));
+  }
+
+  function getFieldError(key: keyof TicketTouched) {
+    return touched[key] && errors[key] ? errors[key] : '';
+  }
 
   async function handlePickAttachment() {
     if (attachments.length >= 3) {
@@ -118,34 +147,48 @@ export default function SupportTicketFormScreen() {
       return;
     }
 
-    const result = await DocumentPicker.getDocumentAsync({
-      copyToCacheDirectory: true,
-      multiple: false,
-    });
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
 
-    if (result.canceled || !result.assets?.length) return;
+      if (result.canceled || !result.assets?.length) return;
 
-    const asset = result.assets[0];
-    if (!asset) return;
+      const asset = result.assets[0];
+      if (!asset) return;
 
-    const already = attachments.some((a) => a.name === asset.name && a.size === asset.size);
-    if (already) {
-      showToast('This file is already added.', 'error');
-      return;
+      const already = attachments.some((item) => item.name === asset.name && item.size === asset.size);
+      if (already) {
+        showToast('This file is already added.', 'error');
+        return;
+      }
+
+      setAttachments((prev) => [...prev, asset]);
+    } catch {
+      showToast('Unable to open file picker.', 'error');
     }
-
-    setAttachments((prev) => [...prev, asset]);
   }
 
   function handleRemoveAttachment(index: number) {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
+    setAttachments((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
   }
 
   async function handleSubmit() {
-    setTouched({ category: true, message: true, priority: true, subject: true });
+    setTouched({
+      category: true,
+      message: true,
+      priority: true,
+      subject: true,
+    });
 
-    if (hasErrors || !form.category || !form.priority) return;
-    if (!session?.accessToken) return;
+    if (hasErrors || !form.category || !form.priority) {
+      return;
+    }
+
+    if (!session?.accessToken) {
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -161,271 +204,297 @@ export default function SupportTicketFormScreen() {
       router.replace('/support-tickets');
     } catch (error) {
       if (!(error instanceof UnauthorizedError)) {
-        showToast(error instanceof Error ? error.message : 'Failed to submit ticket.', 'error');
+        const message = error instanceof Error ? error.message : 'Failed to submit ticket.';
+        showToast(message, 'error');
+        setInfoModal({
+          eyebrow: 'Submission failed',
+          message,
+          title: 'Ticket could not be created',
+          visible: true,
+        });
       }
     } finally {
       setSubmitting(false);
     }
   }
 
-  function setField<K extends keyof TicketForm>(key: K, value: TicketForm[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function touchField(key: keyof TicketTouched) {
-    setTouched((prev) => ({ ...prev, [key]: true }));
-  }
-
   return (
-    <FloatingPageShell
-      avatarLetter={avatarLetter}
-      onBackPress={() => router.back()}
-      onNotificationPress={() => {}}
-      onProfilePress={() => {}}
-      profileImageUrl={session.profileImageUrl}
-      title="New Ticket">
-      <View style={styles.heroSection}>
-        <Text style={styles.heroTitle}>Create Support Ticket</Text>
-        <Text style={styles.heroBody}>
-          Describe your issue and our team will respond as soon as possible.
-        </Text>
-      </View>
-
-      <View style={styles.formCard}>
-        <View style={styles.fieldBlock}>
-          <Text style={styles.fieldLabel}>Ticket Number</Text>
-          <View style={styles.readonlyField}>
-            <MaterialIcons color={palette.onSurfaceVariant} name="confirmation-number" size={16} />
-            <Text style={styles.readonlyText}>Auto-generated on submission</Text>
-          </View>
+    <>
+      <FloatingPageShell
+        avatarLetter={avatarLetter}
+        onBackPress={closeForm}
+        onNotificationPress={() =>
+          setInfoModal({
+            eyebrow: 'Support',
+            message: 'You can review ticket responses and status updates from the support tickets workspace.',
+            title: 'Support updates',
+            visible: true,
+          })
+        }
+        onProfilePress={() =>
+          setInfoModal({
+            eyebrow: 'Account',
+            message: `Signed in as ${session.email}`,
+            title: 'Account',
+            visible: true,
+          })
+        }
+        profileImageUrl={session.profileImageUrl}
+        title="Create ticket">
+        <View style={styles.heroSection}>
+          <Text style={styles.heroTitle}>Create Support Ticket</Text>
+          <Text style={styles.heroBody}>
+            Share the issue clearly so the support team can triage it quickly and reply with the right next step.
+          </Text>
         </View>
 
-        <AuthSelectField
-          error={touched.category && errors.category ? errors.category : ''}
-          label="Category"
-          options={CATEGORY_OPTIONS}
-          placeholder="Select category"
-          value={form.category}
-          onSelect={(v) => {
-            setField('category', v as TicketCategory);
-            touchField('category');
-          }}
-        />
-
-        <AuthSelectField
-          error={touched.priority && errors.priority ? errors.priority : ''}
-          label="Priority"
-          options={PRIORITY_OPTIONS}
-          placeholder="Select priority"
-          value={form.priority}
-          onSelect={(v) => {
-            setField('priority', v as TicketPriority);
-            touchField('priority');
-          }}
-        />
-
-        <View style={styles.fieldBlock}>
-          <View style={styles.fieldLabelRow}>
-            <Text style={[styles.fieldLabel, touched.subject && errors.subject ? styles.fieldLabelError : null]}>
-              Subject
-            </Text>
-            <Text style={[styles.wordCount, subjectWordCount > 10 ? styles.wordCountError : null]}>
-              {subjectWordCount} / 10 words
-            </Text>
-          </View>
-          <TextInput
-            placeholder="Brief description of your issue"
-            placeholderTextColor={palette.onSurfaceVariant}
-            returnKeyType="next"
-            style={[styles.textInput, touched.subject && errors.subject ? styles.textInputError : null]}
-            value={form.subject}
-            onBlur={() => touchField('subject')}
-            onChangeText={(v) => setField('subject', v)}
-          />
-          {touched.subject && errors.subject ? (
-            <Text style={styles.fieldError}>{errors.subject}</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.fieldBlock}>
-          <View style={styles.fieldLabelRow}>
-            <Text style={[styles.fieldLabel, touched.message && errors.message ? styles.fieldLabelError : null]}>
-              Message
-            </Text>
-            <Text style={[styles.wordCount, messageWordCount > 50 ? styles.wordCountError : null]}>
-              {messageWordCount} / 50 words
-            </Text>
-          </View>
-          <TextInput
-            multiline
-            numberOfLines={5}
-            placeholder="Describe your issue in detail"
-            placeholderTextColor={palette.onSurfaceVariant}
-            style={[styles.textArea, touched.message && errors.message ? styles.textInputError : null]}
-            value={form.message}
-            onBlur={() => touchField('message')}
-            onChangeText={(v) => setField('message', v)}
-          />
-          {touched.message && errors.message ? (
-            <Text style={styles.fieldError}>{errors.message}</Text>
-          ) : null}
-        </View>
-
-        <View style={styles.fieldBlock}>
-          <View style={styles.fieldLabelRow}>
-            <Text style={styles.fieldLabel}>Attachments</Text>
-            <Text style={styles.optionalLabel}>Optional · up to 3 files</Text>
-          </View>
-
-          {attachments.map((file, index) => (
-            <View key={`${file.name}-${index}`} style={styles.attachmentRow}>
-              <View style={styles.attachmentIconWrap}>
-                <MaterialIcons color={palette.primary} name="attach-file" size={18} />
+        <View style={styles.contentWrap}>
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Ticket Setup</Text>
+            <View style={styles.formStack}>
+              <View style={styles.readonlyCard}>
+                <View style={styles.readonlyIconWrap}>
+                  <MaterialIcons color={palette.primary} name="confirmation-number" size={18} />
+                </View>
+                <View style={styles.readonlyCopy}>
+                  <Text style={styles.readonlyTitle}>Ticket number</Text>
+                  <Text style={styles.readonlyBody}>Generated automatically once you submit this request.</Text>
+                </View>
               </View>
-              <View style={styles.attachmentCopy}>
-                <Text numberOfLines={1} style={styles.attachmentName}>{file.name}</Text>
-                <Text style={styles.attachmentSize}>{formatFileSize(file.size ?? 0)}</Text>
+
+              <AuthSelectField
+                error={getFieldError('category')}
+                label="Category"
+                options={CATEGORY_OPTIONS}
+                placeholder="Select category"
+                value={form.category}
+                onSelect={(value) => {
+                  setField('category', value as TicketCategory);
+                  touchField('category');
+                }}
+              />
+
+              <AuthSelectField
+                error={getFieldError('priority')}
+                label="Priority"
+                options={PRIORITY_OPTIONS}
+                placeholder="Select priority"
+                value={form.priority}
+                onSelect={(value) => {
+                  setField('priority', value as TicketPriority);
+                  touchField('priority');
+                }}
+              />
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Issue Details</Text>
+            <View style={styles.formStack}>
+              <AuthTextField
+                actionLabel={`${subjectWordCount} / 10 words`}
+                autoCapitalize="sentences"
+                error={getFieldError('subject')}
+                icon="short-text"
+                label="Subject"
+                placeholder="Brief description of your issue"
+                value={form.subject}
+                onBlur={() => touchField('subject')}
+                onChangeText={(value) => setField('subject', value)}
+              />
+
+              <AuthTextField
+                actionLabel={`${messageWordCount} / 50 words`}
+                autoCapitalize="sentences"
+                error={getFieldError('message')}
+                icon="notes"
+                label="Message"
+                multiline
+                numberOfLines={6}
+                placeholder="Describe your issue in detail"
+                style={styles.textAreaInput}
+                textAlignVertical="top"
+                value={form.message}
+                onBlur={() => touchField('message')}
+                onChangeText={(value) => setField('message', value)}
+              />
+            </View>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Attachments</Text>
+            <View style={styles.formStack}>
+              <View style={styles.attachmentIntroCard}>
+                <View style={styles.attachmentIntroIconWrap}>
+                  <MaterialIcons color={palette.primary} name="attach-file" size={20} />
+                </View>
+                <View style={styles.attachmentIntroCopy}>
+                  <Text style={styles.attachmentIntroTitle}>Supporting files</Text>
+                  <Text style={styles.attachmentIntroBody}>
+                    Add screenshots, PDFs, or other files that help explain the issue. Up to 3 attachments.
+                  </Text>
+                </View>
               </View>
-              <Pressable hitSlop={8} onPress={() => handleRemoveAttachment(index)}>
-                <MaterialIcons color={palette.error} name="close" size={20} />
+
+              {attachments.map((file, index) => (
+                <View key={`${file.name}-${index}`} style={styles.attachmentRow}>
+                  <View style={styles.attachmentIconWrap}>
+                    <MaterialIcons color={palette.primary} name="description" size={18} />
+                  </View>
+                  <View style={styles.attachmentCopy}>
+                    <Text numberOfLines={1} style={styles.attachmentName}>
+                      {file.name}
+                    </Text>
+                    <Text style={styles.attachmentSize}>{formatFileSize(file.size ?? 0)}</Text>
+                  </View>
+                  <Pressable hitSlop={8} onPress={() => handleRemoveAttachment(index)}>
+                    <MaterialIcons color={palette.error} name="close" size={20} />
+                  </Pressable>
+                </View>
+              ))}
+
+              {attachments.length < 3 ? (
+                <Pressable style={styles.inlineActionButton} onPress={handlePickAttachment}>
+                  <MaterialIcons color={palette.primary} name="upload-file" size={18} />
+                  <Text style={styles.inlineActionButtonText}>
+                    {attachments.length === 0 ? 'Add attachment' : 'Add another file'}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+
+          <View style={styles.actionCard}>
+            <View style={styles.actions}>
+              <Pressable
+                style={[
+                  styles.actionButton,
+                  styles.actionButtonSecondary,
+                  submitting ? styles.actionButtonDisabled : null,
+                ]}
+                disabled={submitting}
+                onPress={closeForm}>
+                <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.actionButton, submitting || hasErrors ? styles.actionButtonDisabled : null]}
+                disabled={submitting || hasErrors}
+                onPress={handleSubmit}>
+                {submitting ? (
+                  <ActivityIndicator color={palette.onPrimary} size="small" />
+                ) : (
+                  <Text style={styles.actionButtonText}>Submit ticket</Text>
+                )}
               </Pressable>
             </View>
-          ))}
-
-          {attachments.length < 3 ? (
-            <Pressable style={styles.attachButton} onPress={handlePickAttachment}>
-              <MaterialIcons color={palette.primary} name="add" size={18} />
-              <Text style={styles.attachButtonText}>
-                {attachments.length === 0 ? 'Add attachment' : 'Add another file'}
-              </Text>
-            </Pressable>
-          ) : null}
+          </View>
         </View>
-      </View>
+      </FloatingPageShell>
 
-      <View style={styles.submitRow}>
-        <Pressable
-          disabled={submitting}
-          style={[styles.submitButton, submitting ? styles.submitButtonDisabled : null]}
-          onPress={handleSubmit}>
-          {submitting ? (
-            <ActivityIndicator color={palette.onPrimary} size="small" />
-          ) : (
-            <>
-              <MaterialIcons color={palette.onPrimary} name="send" size={18} />
-              <Text style={styles.submitButtonText}>Submit Ticket</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
-    </FloatingPageShell>
+      <AppMessageModal
+        eyebrow={infoModal.eyebrow}
+        message={infoModal.message}
+        title={infoModal.title}
+        visible={infoModal.visible}
+        onClose={() => setInfoModal((current) => ({ ...current, visible: false }))}
+      />
+    </>
   );
 }
 
+const cardShadow = {
+  shadowColor: '#000000',
+  shadowOffset: { width: 0, height: 10 },
+  shadowOpacity: 0.12,
+  shadowRadius: 24,
+};
+
 const styles = StyleSheet.create({
-  heroSection: {
-    gap: spacing.xs,
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.marginMobile,
-    paddingTop: spacing.lg,
+  actionButton: {
+    alignItems: 'center',
+    backgroundColor: palette.primary,
+    borderRadius: radius.md,
+    flex: 1,
+    height: 50,
+    justifyContent: 'center',
   },
-  heroTitle: {
-    color: palette.white,
-    fontSize: typography.display,
+  actionButtonDisabled: {
+    opacity: 0.7,
+  },
+  actionButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderColor: palette.outlineVariant,
+    borderWidth: 1,
+  },
+  actionButtonText: {
+    color: palette.onPrimary,
+    fontSize: typography.body,
     fontWeight: '700',
   },
-  heroBody: {
-    color: 'rgba(255,255,255,0.84)',
-    fontSize: typography.body,
+  actionButtonTextSecondary: {
+    color: palette.onSurface,
   },
-  formCard: {
-    backgroundColor: 'rgba(255,255,255,0.97)',
-    borderColor: 'rgba(255,255,255,0.3)',
+  actionCard: {
+    ...cardShadow,
+    backgroundColor: palette.surfaceContainerLowest,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
     borderRadius: radius.lg,
     borderWidth: 1,
-    gap: spacing.md,
-    marginHorizontal: spacing.marginMobile,
+    marginBottom: spacing.xl,
     padding: spacing.lg,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
   },
-  fieldBlock: {
-    gap: spacing.xs,
-  },
-  fieldLabelRow: {
-    alignItems: 'center',
+  actions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
-  fieldLabel: {
-    color: palette.onSurface,
-    fontSize: typography.label,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
+  attachmentCopy: {
+    flex: 1,
+    gap: 2,
   },
-  fieldLabelError: {
-    color: palette.error,
-  },
-  fieldError: {
-    color: palette.error,
-    fontSize: typography.label,
-    marginTop: 2,
-  },
-  wordCount: {
-    color: palette.onSurfaceVariant,
-    fontSize: typography.label,
-    fontWeight: '600',
-  },
-  wordCountError: {
-    color: palette.error,
-  },
-  optionalLabel: {
-    color: palette.onSurfaceVariant,
-    fontSize: typography.label,
-  },
-  readonlyField: {
+  attachmentIconWrap: {
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 92, 171, 0.1)',
+    borderRadius: radius.pill,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  attachmentIntroBody: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
+  },
+  attachmentIntroCard: {
+    alignItems: 'flex-start',
     backgroundColor: '#F8FAFC',
-    borderColor: palette.outlineVariant,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
-    minHeight: 48,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    padding: spacing.md,
   },
-  readonlyText: {
-    color: palette.onSurfaceVariant,
-    fontSize: typography.body,
-    fontStyle: 'italic',
+  attachmentIntroCopy: {
+    flex: 1,
+    gap: 4,
   },
-  textInput: {
-    borderColor: palette.outlineVariant,
-    borderRadius: radius.md,
-    borderWidth: 1,
+  attachmentIntroIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 92, 171, 0.1)',
+    borderRadius: radius.pill,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  attachmentIntroTitle: {
     color: palette.onSurface,
     fontSize: typography.body,
-    minHeight: 48,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    fontWeight: '700',
   },
-  textInputError: {
-    borderColor: palette.error,
-  },
-  textArea: {
-    borderColor: palette.outlineVariant,
-    borderRadius: radius.md,
-    borderWidth: 1,
+  attachmentName: {
     color: palette.onSurface,
-    fontSize: typography.body,
-    minHeight: 120,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    textAlignVertical: 'top',
+    fontSize: typography.bodySmall,
+    fontWeight: '700',
   },
   attachmentRow: {
     alignItems: 'center',
@@ -437,28 +506,35 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.sm,
   },
-  attachmentIconWrap: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 92, 171, 0.1)',
-    borderRadius: radius.pill,
-    height: 32,
-    justifyContent: 'center',
-    width: 32,
-  },
-  attachmentCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  attachmentName: {
-    color: palette.onSurface,
-    fontSize: typography.bodySmall,
-    fontWeight: '700',
-  },
   attachmentSize: {
     color: palette.onSurfaceVariant,
     fontSize: typography.label,
   },
-  attachButton: {
+  contentWrap: {
+    gap: spacing.lg,
+    paddingHorizontal: spacing.marginMobile,
+  },
+  formStack: {
+    gap: spacing.md,
+  },
+  heroBody: {
+    color: 'rgba(255,255,255,0.84)',
+    fontSize: typography.body,
+    lineHeight: 24,
+    maxWidth: 520,
+  },
+  heroSection: {
+    gap: spacing.xs,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.marginMobile,
+    paddingTop: spacing.lg,
+  },
+  heroTitle: {
+    color: palette.white,
+    fontSize: typography.display,
+    fontWeight: '700',
+  },
+  inlineActionButton: {
     alignItems: 'center',
     borderColor: 'rgba(0, 92, 171, 0.24)',
     borderRadius: radius.md,
@@ -467,35 +543,65 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.xs,
     justifyContent: 'center',
-    minHeight: 44,
+    minHeight: 48,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  attachButtonText: {
+  inlineActionButtonText: {
     color: palette.primary,
     fontSize: typography.bodySmall,
     fontWeight: '700',
   },
-  submitRow: {
-    marginBottom: spacing.xl,
-    marginHorizontal: spacing.marginMobile,
-    marginTop: spacing.lg,
+  readonlyBody: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+    lineHeight: 20,
   },
-  submitButton: {
-    alignItems: 'center',
-    backgroundColor: palette.primary,
+  readonlyCard: {
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    borderColor: 'rgba(15, 23, 42, 0.08)',
     borderRadius: radius.md,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.sm,
-    height: 52,
+    padding: spacing.md,
+  },
+  readonlyCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  readonlyIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 92, 171, 0.1)',
+    borderRadius: radius.pill,
+    height: 36,
     justifyContent: 'center',
+    width: 36,
   },
-  submitButtonDisabled: {
-    opacity: 0.7,
-  },
-  submitButtonText: {
-    color: palette.onPrimary,
+  readonlyTitle: {
+    color: palette.onSurface,
     fontSize: typography.body,
     fontWeight: '700',
+  },
+  sectionCard: {
+    ...cardShadow,
+    backgroundColor: palette.surfaceContainerLowest,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    gap: spacing.md,
+    padding: spacing.lg,
+  },
+  sectionTitle: {
+    color: palette.onSurface,
+    fontSize: typography.label,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  textAreaInput: {
+    minHeight: 128,
+    paddingTop: spacing.sm,
   },
 });

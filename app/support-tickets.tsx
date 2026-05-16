@@ -1,11 +1,16 @@
 import * as DocumentPicker from 'expo-document-picker';
 import type { DocumentPickerAsset } from 'expo-document-picker';
+import * as Linking from 'expo-linking';
 import { MaterialIcons } from '@expo/vector-icons';
+import { File, Paths } from 'expo-file-system';
+import { getContentUriAsync } from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useFocusEffect } from '@react-navigation/native';
 import { Redirect, router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -21,10 +26,10 @@ import { AppModal } from '@/components/app/app-modal';
 import { AppMessageModal } from '@/components/app/app-message-modal';
 import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
+import { apiConfig } from '@/constants/api';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
-  type AddCommentPayload,
   type SupportTicketRecord,
   type TicketStatus,
   addTicketComment,
@@ -68,6 +73,15 @@ const PRIORITY_COLOURS: Record<string, string> = {
   URGENT: '#7C3AED',
 };
 
+const SUPPORT_COMPANY_DETAILS = {
+  companyName: 'ManagePro',
+  email: 'support@managepro.app',
+  phone: '+254 700 000 000',
+  supportHours: 'Monday to Friday, 8:00 AM to 5:00 PM',
+  websiteLabel: 'www.managepro.app',
+  websiteUrl: 'https://www.managepro.app',
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -90,6 +104,10 @@ function formatFileSize(size: number) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
 function getStatusStyle(status: TicketStatus) {
@@ -171,6 +189,7 @@ export default function SupportTicketsScreen() {
   const [commentText, setCommentText] = useState('');
   const [commentFile, setCommentFile] = useState<DocumentPickerAsset | null>(null);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [supportContactModalOpen, setSupportContactModalOpen] = useState(false);
 
   const [infoModal, setInfoModal] = useState({ eyebrow: '', message: '', title: '', visible: false });
 
@@ -341,6 +360,70 @@ export default function SupportTicketsScreen() {
     }
   }
 
+  async function handleOpenTicketAttachment(
+    ticketId: string,
+    fileName: string,
+    mimeType: string | null | undefined,
+    endpointPath: string,
+  ) {
+    if (!session?.accessToken) {
+      return;
+    }
+
+    try {
+      const downloadedFile = await File.downloadFileAsync(
+        `${apiConfig.baseUrl}${endpointPath}`,
+        new File(Paths.cache, `${ticketId}-${sanitizeFileName(fileName)}`),
+        {
+          headers: {
+            Authorization: `Bearer ${session.accessToken}`,
+          },
+          idempotent: true,
+        }
+      );
+
+      const resolvedMimeType = mimeType ?? 'application/octet-stream';
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(downloadedFile.uri, {
+          UTI: resolvedMimeType,
+          dialogTitle: fileName,
+          mimeType: resolvedMimeType,
+        });
+        return;
+      }
+
+      const localUrl =
+        Platform.OS === 'android'
+          ? await getContentUriAsync(downloadedFile.uri)
+          : downloadedFile.uri;
+
+      const canOpen = await Linking.canOpenURL(localUrl);
+      if (canOpen) {
+        await Linking.openURL(localUrl);
+        return;
+      }
+
+      showToast('Unable to preview this attachment on the device.', 'error');
+    } catch {
+      showToast('Unable to open attachment.', 'error');
+    }
+  }
+
+  async function handleOpenSupportLink(url: string) {
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        showToast('This contact option is not available on the device.', 'error');
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch {
+      showToast('Unable to open the contact link.', 'error');
+    }
+  }
+
   function handleBottomNavPress(key: string) {
     if (key === 'home') { router.replace('/dashboard'); return; }
     if (key === 'covers') { router.push('/covers'); return; }
@@ -468,7 +551,12 @@ export default function SupportTicketsScreen() {
 
         <View style={[styles.promoCard, { backgroundColor: palette.primaryContainer }]}>
           <View style={styles.promoCopy}>
-            <Text style={styles.promoTitle}>Need Help?</Text>
+            <View style={styles.promoHeaderRow}>
+              <Text style={styles.promoTitle}>Need Help?</Text>
+              <Pressable style={styles.promoButton} onPress={() => setSupportContactModalOpen(true)}>
+                <Text style={styles.promoButtonText}>Contact details</Text>
+              </Pressable>
+            </View>
             <Text style={styles.promoBody}>
               Our support team typically responds within 24 hours. Submit a ticket for the fastest resolution.
             </Text>
@@ -478,6 +566,79 @@ export default function SupportTicketsScreen() {
       </FloatingPageShell>
 
       {/* ── Ticket Detail Modal ── */}
+      <AppModal
+        footer={
+          <View style={styles.modalFooter}>
+            <Pressable
+              style={[styles.modalButton, styles.modalButtonOutline]}
+              onPress={() => setSupportContactModalOpen(false)}>
+              <Text style={[styles.modalButtonText, styles.modalButtonTextOutline]}>Close</Text>
+            </Pressable>
+          </View>
+        }
+        frameStyle={styles.contactModalFrame}
+        title="Company Contact Details"
+        visible={supportContactModalOpen}
+        onClose={() => setSupportContactModalOpen(false)}>
+        <View style={styles.contactModalContent}>
+          <View style={styles.contactHeroCard}>
+            <View style={styles.contactHeroIconWrap}>
+              <MaterialIcons color={palette.primary} name="business" size={20} />
+            </View>
+            <View style={styles.contactHeroCopy}>
+              <Text style={styles.contactHeroTitle}>{SUPPORT_COMPANY_DETAILS.companyName}</Text>
+              <Text style={styles.contactHeroBody}>
+                Reach our support team directly if you need company details or help outside the ticket queue.
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.contactInfoList}>
+            <View style={styles.contactInfoRow}>
+              <Text style={styles.contactInfoLabel}>Company</Text>
+              <Text style={styles.contactInfoValue}>{SUPPORT_COMPANY_DETAILS.companyName}</Text>
+            </View>
+            <View style={styles.contactInfoRow}>
+              <Text style={styles.contactInfoLabel}>Email</Text>
+              <Text style={styles.contactInfoValue}>{SUPPORT_COMPANY_DETAILS.email}</Text>
+            </View>
+            <View style={styles.contactInfoRow}>
+              <Text style={styles.contactInfoLabel}>Phone</Text>
+              <Text style={styles.contactInfoValue}>{SUPPORT_COMPANY_DETAILS.phone}</Text>
+            </View>
+            <View style={styles.contactInfoRow}>
+              <Text style={styles.contactInfoLabel}>Support Hours</Text>
+              <Text style={styles.contactInfoValue}>{SUPPORT_COMPANY_DETAILS.supportHours}</Text>
+            </View>
+            <View style={styles.contactInfoRow}>
+              <Text style={styles.contactInfoLabel}>Website</Text>
+              <Text style={styles.contactInfoValue}>{SUPPORT_COMPANY_DETAILS.websiteLabel}</Text>
+            </View>
+          </View>
+
+          <View style={styles.contactActionList}>
+            <Pressable
+              style={styles.contactActionButton}
+              onPress={() => handleOpenSupportLink(`tel:${SUPPORT_COMPANY_DETAILS.phone.replace(/\s+/g, '')}`)}>
+              <MaterialIcons color={palette.primary} name="phone" size={18} />
+              <Text style={styles.contactActionText}>Call support</Text>
+            </Pressable>
+            <Pressable
+              style={styles.contactActionButton}
+              onPress={() => handleOpenSupportLink(`mailto:${SUPPORT_COMPANY_DETAILS.email}`)}>
+              <MaterialIcons color={palette.primary} name="mail-outline" size={18} />
+              <Text style={styles.contactActionText}>Email support</Text>
+            </Pressable>
+            <Pressable
+              style={styles.contactActionButton}
+              onPress={() => handleOpenSupportLink(SUPPORT_COMPANY_DETAILS.websiteUrl)}>
+              <MaterialIcons color={palette.primary} name="language" size={18} />
+              <Text style={styles.contactActionText}>Visit website</Text>
+            </Pressable>
+          </View>
+        </View>
+      </AppModal>
+
       <AppModal
         footer={
           detailTicket && !detailLoading ? (
@@ -561,16 +722,30 @@ export default function SupportTicketsScreen() {
             </View>
 
             {/* Attachments */}
-            {(detailTicket.attachmentUrls?.length ?? 0) > 0 ? (
+            {(detailTicket.attachments?.length ?? 0) > 0 ? (
               <View style={styles.attachmentList}>
                 <Text style={styles.sectionSubLabel}>Attachments</Text>
-                {detailTicket.attachmentUrls.map((att, i) => (
-                  <View key={i} style={styles.attachmentRow}>
+                {detailTicket.attachments.map((att, index) => (
+                  <Pressable
+                    key={`${att.objectKey}-${index}`}
+                    style={styles.attachmentRow}
+                    onPress={() =>
+                      handleOpenTicketAttachment(
+                        detailTicket.id,
+                        att.fileName,
+                        att.mimeType,
+                        `/support-tickets/${detailTicket.id}/attachments/${index}`,
+                      )
+                    }>
                     <View style={styles.attachmentIconWrap}>
                       <MaterialIcons color={palette.primary} name="attach-file" size={16} />
                     </View>
-                    <Text numberOfLines={1} style={styles.attachmentName}>{att.fileName}</Text>
-                  </View>
+                    <View style={styles.attachmentCopy}>
+                      <Text numberOfLines={1} style={styles.attachmentName}>{att.fileName}</Text>
+                      <Text style={styles.attachmentSize}>{formatFileSize(att.size)}</Text>
+                    </View>
+                    <MaterialIcons color={palette.onSurfaceVariant} name="open-in-new" size={16} />
+                  </Pressable>
                 ))}
               </View>
             ) : null}
@@ -601,11 +776,21 @@ export default function SupportTicketsScreen() {
                     </View>
                     <Text style={styles.commentText}>{comment.message}</Text>
                     {comment.attachment ? (
-                      <View style={styles.commentAttachRow}>
+                      <Pressable
+                        style={styles.commentAttachRow}
+                        onPress={() =>
+                          handleOpenTicketAttachment(
+                            detailTicket.id,
+                            comment.attachment.fileName,
+                            comment.attachment.mimeType,
+                            `/support-tickets/${detailTicket.id}/comments/${comment.id}/attachment`,
+                          )
+                        }>
                         <MaterialIcons color={palette.onSurfaceVariant} name="attach-file" size={14} />
                         <Text style={styles.commentAttachName}>{comment.attachment.fileName}</Text>
                         <Text style={styles.commentAttachSize}>· {formatFileSize(comment.attachment.size)}</Text>
-                      </View>
+                        <MaterialIcons color={palette.onSurfaceVariant} name="open-in-new" size={14} />
+                      </Pressable>
                     ) : null}
                   </View>
                 ))}
@@ -891,14 +1076,80 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   promoCopy: { gap: spacing.xs, zIndex: 1 },
+  promoHeaderRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs },
+  promoButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'rgba(255,255,255,0.22)',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    minHeight: 42,
+    padding: spacing.sm,
+    justifyContent: 'center',
+  },
+  promoButtonText: { color: palette.onPrimaryContainer, fontSize: typography.bodySmall, fontWeight: '700' },
   promoTitle: { color: palette.onPrimaryContainer, fontSize: typography.title, fontWeight: '700' },
   promoBody: { color: 'rgba(254,252,255,0.9)', fontSize: typography.bodySmall, maxWidth: '70%' },
   promoIcon: { bottom: -24, position: 'absolute', right: -12, transform: [{ rotate: '12deg' }] },
 
   // Detail modal
+  contactModalFrame: { maxWidth: 460 } as ViewStyle,
   detailModalFrame: { maxHeight: '85%' } as ViewStyle,
   viewModalFrame: { maxHeight: '75%' } as ViewStyle,
   commentModalFrame: { maxWidth: 440 } as ViewStyle,
+
+  contactModalContent: { gap: spacing.md },
+  contactHeroCard: {
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(0,92,171,0.04)',
+    borderColor: 'rgba(0,92,171,0.12)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  contactHeroIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,92,171,0.1)',
+    borderRadius: radius.pill,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  contactHeroCopy: { flex: 1, gap: 4 },
+  contactHeroTitle: { color: palette.onSurface, fontSize: typography.body, fontWeight: '700' },
+  contactHeroBody: { color: palette.onSurfaceVariant, fontSize: typography.bodySmall, lineHeight: 20 },
+  contactInfoList: { gap: spacing.sm },
+  contactInfoRow: {
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderColor: 'rgba(192,199,214,0.45)',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: 4,
+    padding: spacing.md,
+  },
+  contactInfoLabel: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.label,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  contactInfoValue: { color: palette.onSurface, fontSize: typography.bodySmall, fontWeight: '600', lineHeight: 20 },
+  contactActionList: { gap: spacing.sm },
+  contactActionButton: {
+    alignItems: 'center',
+    borderColor: palette.outlineVariant,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: spacing.md,
+  },
+  contactActionText: { color: palette.primary, fontSize: typography.bodySmall, fontWeight: '700' },
 
   modalSection: { gap: spacing.md },
   loadingState: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.lg },
@@ -947,7 +1198,9 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   attachmentIconWrap: { alignItems: 'center', backgroundColor: 'rgba(0,92,171,0.1)', borderRadius: radius.pill, height: 28, justifyContent: 'center', width: 28 },
-  attachmentName: { color: palette.onSurface, flex: 1, fontSize: typography.bodySmall, fontWeight: '600' },
+  attachmentCopy: { flex: 1, gap: 2, minWidth: 0 },
+  attachmentName: { color: palette.onSurface, flex: 1, flexShrink: 1, fontSize: typography.bodySmall, fontWeight: '600' },
+  attachmentSize: { color: palette.onSurfaceVariant, fontSize: typography.label },
 
   commentThread: { gap: spacing.sm },
   commentBubble: {
@@ -966,8 +1219,8 @@ const styles = StyleSheet.create({
   commentAuthorLabelAdmin: { color: palette.primary },
   commentDate: { color: palette.onSurfaceVariant, fontSize: typography.label },
   commentText: { color: palette.onSurface, fontSize: typography.bodySmall, lineHeight: 20 },
-  commentAttachRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
-  commentAttachName: { color: palette.onSurfaceVariant, fontSize: typography.label, fontWeight: '600' },
+  commentAttachRow: { alignItems: 'center', flexDirection: 'row', gap: 4, minWidth: 0 },
+  commentAttachName: { color: palette.onSurfaceVariant, flexShrink: 1, fontSize: typography.label, fontWeight: '600' },
   commentAttachSize: { color: palette.onSurfaceVariant, fontSize: typography.label },
 
   noCommentsState: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },

@@ -20,7 +20,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { imagery, palette, radius, spacing, typography } from '@/constants/app-theme';
+import { UnauthorizedError } from '@/features/api/auth-session';
+import { getContracts } from '@/features/contracts/contracts-api';
+import { getCovers } from '@/features/covers/covers-api';
 import { dashboardShortcuts, recentActivity } from '@/features/dashboard/data';
+import { getSupportTickets } from '@/features/support-tickets/support-tickets-api';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
 import { useToast } from '@/providers/toast-provider';
@@ -31,6 +35,9 @@ export default function DashboardScreen() {
   const { hasActiveSubscription, subscriptionLoading, reloadSubscription } = useSubscription();
   const [activeTab, setActiveTab] = useState('home');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [contractsCount, setContractsCount] = useState(0);
+  const [coversCount, setCoversCount] = useState(0);
+  const [ticketsCount, setTicketsCount] = useState(0);
   const { width } = useWindowDimensions();
 
   useFocusEffect(
@@ -39,11 +46,69 @@ export default function DashboardScreen() {
     }, [reloadSubscription])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!session?.accessToken || subscriptionLoading || !hasActiveSubscription) {
+        setContractsCount(0);
+        setCoversCount(0);
+        setTicketsCount(0);
+        return;
+      }
+
+      let active = true;
+
+      async function loadDashboardCounts() {
+        try {
+          const [contracts, covers, tickets] = await Promise.all([
+            getContracts(session.accessToken),
+            getCovers(session.accessToken),
+            getSupportTickets(session.accessToken),
+          ]);
+
+          if (!active) {
+            return;
+          }
+
+          setContractsCount(contracts.length);
+          setCoversCount(covers.length);
+          setTicketsCount(tickets.length);
+        } catch (error) {
+          if (!active || error instanceof UnauthorizedError) {
+            return;
+          }
+
+          showToast(error instanceof Error ? error.message : 'Unable to load dashboard totals.', 'error');
+        }
+      }
+
+      loadDashboardCounts();
+
+      return () => {
+        active = false;
+      };
+    }, [hasActiveSubscription, session?.accessToken, showToast, subscriptionLoading])
+  );
+
   const displayName = session?.name?.trim() || session?.email.split('@')[0] || 'Agent';
   const firstName = session?.firstName?.trim() || displayName.split(' ')[0] || 'Alex';
   const referralCode = session?.referralCode?.trim() || 'AGENT2024';
   const shortcutCardWidth = (width - spacing.marginMobile * 2 - spacing.md) / 2;
   const cardsLocked = subscriptionLoading || !hasActiveSubscription;
+  const dashboardCards = dashboardShortcuts.map((item) => {
+    if (item.title === 'Contracts' || item.icon === 'description') {
+      return { ...item, badge: String(contractsCount) };
+    }
+
+    if (item.title === 'Insurance' || item.icon === 'shield') {
+      return { ...item, badge: String(coversCount) };
+    }
+
+    if (item.title === 'Support' || item.icon === 'contact-support') {
+      return { ...item, badge: String(ticketsCount) };
+    }
+
+    return item;
+  });
 
   if (!session) {
     return <Redirect href="/login" />;
@@ -96,6 +161,11 @@ export default function DashboardScreen() {
 
     if (item.title === 'Contracts' || item.icon === 'description') {
       router.push('/contracts');
+      return;
+    }
+
+    if (item.title === 'Support' || item.icon === 'contact-support') {
+      router.push('/support-tickets');
       return;
     }
 
@@ -193,7 +263,7 @@ export default function DashboardScreen() {
           ) : null}
 
           <View style={styles.shortcutsGrid}>
-            {dashboardShortcuts.map((item) => (
+            {dashboardCards.map((item) => (
               <Pressable
                 key={item.title}
                 style={[
