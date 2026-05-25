@@ -483,6 +483,24 @@ export default function CoverFormScreen() {
                     onBlur={() => markTouched('insuranceProduct')}
                     onChangeText={(value) => updateForm('insuranceProduct', value)}
                   />
+                  <AuthTextField
+                    autoCapitalize="characters"
+                    icon="directions-car"
+                    label="Vehicle reg"
+                    optionalLabel="(Optional)"
+                    placeholder="KDA 123A"
+                    value={form.vehicleReg}
+                    onChangeText={(value) => updateForm('vehicleReg', value)}
+                  />
+                  <AuthTextField
+                    autoCapitalize="characters"
+                    icon="badge"
+                    label="Policy number"
+                    optionalLabel="(Optional)"
+                    placeholder="POL-001"
+                    value={form.policyNumber}
+                    onChangeText={(value) => updateForm('policyNumber', value)}
+                  />
                   <AuthSearchSelectField
                     error={getFieldError('country')}
                     label="Currency Country"
@@ -526,7 +544,7 @@ export default function CoverFormScreen() {
                   />
                   <AuthSelectField
                     error={getFieldError('cycle')}
-                    label="Cycle"
+                    label="Payment Cycle"
                     options={[
                       { label: 'Monthly', value: 'MONTHLY' },
                       { label: 'Annual', value: 'ANNUAL' },
@@ -537,24 +555,6 @@ export default function CoverFormScreen() {
                       updateForm('cycle', value as CoverCycle);
                       markTouched('cycle');
                     }}
-                  />
-                  <AuthTextField
-                    autoCapitalize="characters"
-                    icon="directions-car"
-                    label="Vehicle reg"
-                    optionalLabel="(Optional)"
-                    placeholder="KDA 123A"
-                    value={form.vehicleReg}
-                    onChangeText={(value) => updateForm('vehicleReg', value)}
-                  />
-                  <AuthTextField
-                    autoCapitalize="characters"
-                    icon="badge"
-                    label="Policy number"
-                    optionalLabel="(Optional)"
-                    placeholder="POL-001"
-                    value={form.policyNumber}
-                    onChangeText={(value) => updateForm('policyNumber', value)}
                   />
                 </View>
               </View>

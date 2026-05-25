@@ -981,7 +981,7 @@ export default function CoversScreen() {
         </Text>
 
         <View style={styles.modalSection}>
-          <Text style={styles.modalSectionTitle}>Cycle Due</Text>
+          <Text style={styles.modalSectionTitle}>Payment Cycle Due</Text>
           {cycleDueNotifications.length ? (
             <View style={styles.notificationList}>
               {cycleDueNotifications.map((item, index) => (
@@ -1012,7 +1012,7 @@ export default function CoversScreen() {
             </View>
           ) : (
             <View style={styles.notificationEmpty}>
-              <Text style={styles.notificationEmptyText}>No monthly cycle dues in the next 5 days.</Text>
+              <Text style={styles.notificationEmptyText}>No monthly payment cycle dues in the next 5 days.</Text>
             </View>
           )}
         </View>
