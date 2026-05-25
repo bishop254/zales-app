@@ -429,7 +429,7 @@ export default function ContractFormScreen() {
           })
         }
         profileImageUrl={session.profileImageUrl}
-        title={isEditMode ? 'Edit contract' : 'Add contract'}>
+        title={isEditMode ? 'Edit Contract' : 'Add Contract'}>
         <View style={styles.heroSection}>
           <Text style={styles.heroTitle}>{isEditMode ? 'Update Contract' : 'Create Contract'}</Text>
           <Text style={styles.heroBody}>
@@ -595,7 +595,7 @@ export default function ContractFormScreen() {
                     {submitting ? (
                       <ActivityIndicator color={palette.onPrimary} size="small" />
                     ) : (
-                      <Text style={styles.actionButtonText}>{isEditMode ? 'Save changes' : 'Create contract'}</Text>
+                      <Text style={styles.actionButtonText}>{isEditMode ? 'Save Changes' : 'Create Contract'}</Text>
                     )}
                   </Pressable>
                 </View>

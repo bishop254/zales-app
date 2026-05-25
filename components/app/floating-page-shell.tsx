@@ -20,6 +20,7 @@ type FloatingPageShellProps = {
   bottomSlot?: React.ReactNode;
   overlaySlot?: React.ReactNode;
   profileImageUrl?: string | null;
+  notificationCount?: number;
   title: string;
   onBackPress?: () => void;
   onNotificationPress: () => void;
@@ -34,6 +35,7 @@ export function FloatingPageShell({
   bottomSlot,
   overlaySlot,
   profileImageUrl,
+  notificationCount,
   title,
   onBackPress,
   onNotificationPress,
@@ -64,7 +66,15 @@ export function FloatingPageShell({
           <View style={styles.topBarActions}>
             <Pressable style={styles.notificationButton} onPress={onNotificationPress}>
               <MaterialIcons color="#64748B" name="notifications-none" size={24} />
-              <View style={styles.notificationDot} />
+              {typeof notificationCount === 'number' ? (
+                notificationCount > 0 ? (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>{notificationCount > 99 ? '99+' : notificationCount}</Text>
+                  </View>
+                ) : null
+              ) : (
+                <View style={styles.notificationDot} />
+              )}
             </Pressable>
             <Pressable style={styles.avatarWrap} onPress={onProfilePress}>
               {profileImageUrl ? (
@@ -135,6 +145,25 @@ const styles = StyleSheet.create({
   },
   notificationButton: {
     padding: 2,
+  },
+  notificationBadge: {
+    alignItems: 'center',
+    backgroundColor: palette.tertiary,
+    borderColor: palette.white,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    justifyContent: 'center',
+    minWidth: 20,
+    paddingHorizontal: 4,
+    position: 'absolute',
+    right: -6,
+    top: -6,
+  },
+  notificationBadgeText: {
+    color: palette.white,
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
   },
   notificationDot: {
     backgroundColor: palette.tertiary,

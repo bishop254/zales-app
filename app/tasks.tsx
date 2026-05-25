@@ -593,6 +593,7 @@ export default function TasksScreen() {
       <FloatingPageShell
         avatarLetter={avatarLetter}
         bottomSlot={<FloatingBottomNav activeKey={moreMenuOpen ? 'more' : 'tasks'} onPress={handleBottomNavPress} />}
+        notificationCount={notificationItems.length}
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() => setNotificationsOpen(true)}
         onProfilePress={() =>

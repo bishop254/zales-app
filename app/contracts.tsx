@@ -831,6 +831,7 @@ export default function ContractsScreen() {
       <FloatingPageShell
         avatarLetter={avatarLetter}
         bottomSlot={<FloatingBottomNav activeKey={moreMenuOpen ? 'more' : 'contracts'} onPress={handleBottomNavPress} />}
+        notificationCount={totalNotificationCount}
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() => setNotificationsOpen(true)}
         onProfilePress={() =>

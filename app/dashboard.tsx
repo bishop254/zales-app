@@ -302,7 +302,7 @@ export default function DashboardScreen() {
                     <MaterialIcons
                       color={cardsLocked ? '#94A3B8' : shortcutIconColor[item.iconTone]}
                       name={item.icon}
-                      size={28}
+                      size={24}
                     />
                   </View>
                   <View
@@ -736,10 +736,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: 1,
     elevation: 8,
-    height: 144,
+    height: 132,
     justifyContent: 'space-between',
     overflow: 'hidden',
-    padding: spacing.md,
+    padding: spacing.sm + 2,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.1,
@@ -750,10 +750,10 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
   },
   shortcutEyebrow: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 4,
+    letterSpacing: 1,
+    marginBottom: 3,
     textTransform: 'uppercase',
   },
   shortcutEyebrowLocked: {
@@ -767,16 +767,16 @@ const styles = StyleSheet.create({
   shortcutIconWrap: {
     alignItems: 'center',
     borderRadius: radius.xl,
-    height: 48,
+    height: 42,
     justifyContent: 'center',
-    width: 48,
+    width: 42,
   },
   shortcutIconWrapLocked: {
     backgroundColor: '#CBD5E1',
   },
   shortcutTitle: {
     color: palette.onSurface,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
   },
   shortcutTitleLocked: {

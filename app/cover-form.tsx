@@ -406,7 +406,7 @@ export default function CoverFormScreen() {
           })
         }
         profileImageUrl={session.profileImageUrl}
-        title={isEditMode ? 'Edit cover' : 'Add cover'}>
+        title={isEditMode ? 'Edit Cover' : 'Add Cover'}>
         <View style={styles.heroSection}>
           <Text style={styles.heroTitle}>{isEditMode ? 'Update Cover' : 'Create Cover'}</Text>
           <Text style={styles.heroBody}>
@@ -592,7 +592,7 @@ export default function CoverFormScreen() {
                     {submitting ? (
                       <ActivityIndicator color={palette.onPrimary} size="small" />
                     ) : (
-                      <Text style={styles.actionButtonText}>{isEditMode ? 'Save changes' : 'Create cover'}</Text>
+                      <Text style={styles.actionButtonText}>{isEditMode ? 'Save Changes' : 'Create Cover'}</Text>
                     )}
                   </Pressable>
                 </View>

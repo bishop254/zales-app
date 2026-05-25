@@ -318,10 +318,6 @@ export default function CoversScreen() {
     () =>
       sortBySoonestDate(
         covers.filter((cover) => {
-          if (isMonthlyCover(cover)) {
-            return false;
-          }
-
           const days = daysUntil(cover.expiryDate);
           return days >= 0 && days <= EXPIRY_NOTICE_DAYS;
         }),
@@ -646,6 +642,7 @@ export default function CoversScreen() {
       <FloatingPageShell
         avatarLetter={avatarLetter}
         bottomSlot={<FloatingBottomNav activeKey={moreMenuOpen ? 'more' : 'covers'} onPress={handleBottomNavPress} />}
+        notificationCount={totalNotificationCount}
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() => setNotificationsOpen(true)}
         onProfilePress={() =>

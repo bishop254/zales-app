@@ -44,7 +44,7 @@ export function SummaryCard({
     <Pressable style={[styles.summaryCard, active ? styles.summaryCardActive : null, style]} onPress={onPress}>
       <View style={styles.summaryHeader}>
         <View style={[styles.summaryIconWrap, iconToneStyles[iconTone]]}>
-          <MaterialIcons color={iconToneColors[iconTone]} name={icon} size={26} />
+          <MaterialIcons color={iconToneColors[iconTone]} name={icon} size={24} />
         </View>
         <Text style={styles.summaryCount}>{count}</Text>
       </View>
@@ -63,10 +63,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: 1,
     elevation: 8,
-    height: 144,
+    height: 132,
     justifyContent: 'space-between',
     overflow: 'hidden',
-    padding: spacing.md,
+    padding: spacing.sm + 2,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.1,
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   },
   summaryCount: {
     color: palette.onSurface,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
   },
   summaryHeader: {
@@ -89,20 +89,20 @@ const styles = StyleSheet.create({
   summaryIconWrap: {
     alignItems: 'center',
     borderRadius: radius.xl,
-    height: 48,
+    height: 42,
     justifyContent: 'center',
-    width: 48,
+    width: 42,
   },
   summaryLabel: {
     color: palette.onSurfaceVariant,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.1,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   summaryTitle: {
     color: palette.onSurface,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
   },
 });
