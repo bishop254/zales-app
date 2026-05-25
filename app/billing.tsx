@@ -59,6 +59,24 @@ function formatPriceKes(plan: BillingPlan) {
   return `KES ${plan.priceKes.toLocaleString()}`;
 }
 
+function normalizeMpesaPhone(value: string) {
+  const digits = value.replace(/\D/g, '');
+
+  if (digits.startsWith('254') && digits.length === 12) {
+    return digits;
+  }
+
+  if (digits.startsWith('0') && digits.length === 10) {
+    return `254${digits.slice(1)}`;
+  }
+
+  if (digits.startsWith('7') && digits.length === 9) {
+    return `254${digits}`;
+  }
+
+  return digits;
+}
+
 export default function BillingScreen() {
   const { logout, session } = useAuth();
   const { showToast } = useToast();
@@ -212,9 +230,11 @@ export default function BillingScreen() {
   }
 
   function validatePhone(value: string) {
-    const digits = value.replace(/\D/g, '');
-    if (!digits) return 'Phone number is required.';
-    if (digits.length < 9) return 'Enter a valid phone number (e.g. 0712 345 678).';
+    const normalized = normalizeMpesaPhone(value);
+    if (!normalized) return 'Phone number is required.';
+    if (!/^2547\d{8}$/.test(normalized)) {
+      return 'Enter a valid phone number (e.g. 0712 345 678, 712345678, or 254712345678).';
+    }
     return '';
   }
 
@@ -264,8 +284,9 @@ export default function BillingScreen() {
     setCheckoutStep('submitting');
 
     try {
+      const normalizedPhone = normalizeMpesaPhone(phone);
       const result = await initiateMpesaCheckout(session.accessToken, {
-        phoneNumber: phone.replace(/\D/g, ''),
+        phoneNumber: normalizedPhone,
         planId: selectedPlan.id,
       });
       setCheckoutStep('polling');
