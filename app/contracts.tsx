@@ -581,6 +581,11 @@ export default function ContractsScreen() {
       return;
     }
 
+    if (key === 'journals') {
+      router.push('/journals');
+      return;
+    }
+
     if (key === 'tasks') {
       router.push('/tasks');
       return;
@@ -1453,6 +1458,20 @@ export default function ContractsScreen() {
               <View style={styles.moreMenuCopy}>
                 <Text style={styles.moreMenuTitle}>Billing</Text>
                 <Text style={styles.moreMenuSubtitle}>Manage subscription and payments</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={styles.moreMenuItem}
+              onPress={() => {
+                setMoreMenuOpen(false);
+                router.push('/recycle-bin');
+              }}>
+              <View style={styles.moreMenuIconWrap}>
+                <MaterialIcons color={palette.primary} name="delete-sweep" size={20} />
+              </View>
+              <View style={styles.moreMenuCopy}>
+                <Text style={styles.moreMenuTitle}>Recycle Bin</Text>
+                <Text style={styles.moreMenuSubtitle}>Restore or clear deleted records</Text>
               </View>
             </Pressable>
             <Pressable style={styles.moreMenuItem} onPress={handleLogout}>

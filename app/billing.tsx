@@ -197,6 +197,11 @@ export default function BillingScreen() {
       router.push('/covers');
       return;
     }
+    if (key === 'journals') {
+      setMoreMenuOpen(false);
+      router.push('/journals');
+      return;
+    }
     if (key === 'tasks') {
       setMoreMenuOpen(false);
       router.push('/tasks');
@@ -567,6 +572,20 @@ export default function BillingScreen() {
               <View style={styles.moreMenuCopy}>
                 <Text style={styles.moreMenuTitle}>Support</Text>
                 <Text style={styles.moreMenuSubtitle}>Open support tools and tickets</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={styles.moreMenuItem}
+              onPress={() => {
+                setMoreMenuOpen(false);
+                router.push('/recycle-bin');
+              }}>
+              <View style={styles.moreMenuIconWrap}>
+                <MaterialIcons color={palette.primary} name="delete-sweep" size={20} />
+              </View>
+              <View style={styles.moreMenuCopy}>
+                <Text style={styles.moreMenuTitle}>Recycle Bin</Text>
+                <Text style={styles.moreMenuSubtitle}>Restore or clear deleted records</Text>
               </View>
             </Pressable>
             <Pressable style={styles.moreMenuItem} onPress={handleLogout}>

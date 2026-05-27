@@ -53,14 +53,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.24,
     shadowRadius: 32,
-    width: '84%',
+    width: '92%',
   },
   bottomNavItem: {
     alignItems: 'center',
     borderRadius: radius.lg,
     justifyContent: 'center',
-    minWidth: 52,
-    paddingHorizontal: 10,
+    minWidth: 44,
+    paddingHorizontal: 6,
     paddingVertical: 3,
   },
   bottomNavItemActive: {

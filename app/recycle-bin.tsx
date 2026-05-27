@@ -23,55 +23,55 @@ import { SummaryCard, type SummaryCardTone } from '@/components/dashboard/summar
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
-  deleteJournal,
-  getJournalById,
-  getJournals,
-  getTodayJournal,
-  type JournalRecord,
-} from '@/features/journal/journal-api';
+  getRecycleBinItemById,
+  getRecycleBinItems,
+  permanentlyDeleteRecycleBinItem,
+  restoreRecycleBinItem,
+  type RecycleBinEntityType,
+  type RecycleBinItemRecord,
+} from '@/features/recycle-bin/recycle-bin-api';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
 import { useToast } from '@/providers/toast-provider';
 
-type JournalSummaryCard = {
+type BinFilter = 'ALL' | RecycleBinEntityType;
+
+type RecycleBinSummaryCard = {
   count: string;
+  filter: BinFilter;
   icon: keyof typeof MaterialIcons.glyphMap;
   iconTone: SummaryCardTone;
-  key: 'all' | 'filled' | 'month' | 'today';
   label: string;
   title: string;
 };
 
-type InfoModalState = {
-  eyebrow: string;
-  message: string;
-  title: string;
-  visible: boolean;
-};
-
-type ActionMenuPosition = {
-  top: number;
-};
+type ActionMenuPosition = { top: number };
 
 const ACTION_MENU_HEIGHT = 216;
 
-function formatDate(dateValue: string) {
-  const parsed = new Date(`${dateValue}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return dateValue;
+const ENTITY_CONFIG: Record<
+  RecycleBinEntityType,
+  {
+    icon: keyof typeof MaterialIcons.glyphMap;
+    label: string;
+    tone: SummaryCardTone;
+  }
+> = {
+  CONTRACT: { icon: 'description', label: 'Contract', tone: 'secondary' },
+  COVER: { icon: 'shield', label: 'Cover', tone: 'tertiary' },
+  JOURNAL: { icon: 'menu-book', label: 'Journal', tone: 'primary' },
+  SUPPORT_TICKET: { icon: 'contact-support', label: 'Support', tone: 'neutral' },
+  TASK: { icon: 'assignment', label: 'Task', tone: 'primary' },
+};
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) {
+    return 'Not available';
   }
 
-  return parsed.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function formatDateTime(dateValue: string) {
-  const parsed = new Date(dateValue);
+  const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    return dateValue;
+    return value;
   }
 
   return parsed.toLocaleString('en-GB', {
@@ -83,44 +83,61 @@ function formatDateTime(dateValue: string) {
   });
 }
 
-function getPreviewText(journal: JournalRecord) {
-  return (
-    journal.thoughts ||
-    journal.accomplishments ||
-    journal.gratefulFor ||
-    journal.affirmation ||
-    journal.quoteOfTheDay ||
-    journal.mood ||
-    'No details added yet.'
+function getPurgeLabel(daysRemaining: number) {
+  if (daysRemaining <= 0) {
+    return 'Purges today';
+  }
+
+  if (daysRemaining === 1) {
+    return '1 day left';
+  }
+
+  return `${daysRemaining} days left`;
+}
+
+function buildSummaryCards(items: RecycleBinItemRecord[]): RecycleBinSummaryCard[] {
+  const counts = items.reduce(
+    (acc, item) => {
+      acc.total += 1;
+      acc[item.entityType] = (acc[item.entityType] ?? 0) + 1;
+      return acc;
+    },
+    { total: 0 } as Record<string, number>,
   );
-}
-
-function getCompletionCount(journal: JournalRecord) {
-  return [
-    journal.mood,
-    journal.thoughts,
-    journal.quoteOfTheDay,
-    journal.gratefulFor,
-    journal.affirmation,
-    journal.accomplishments,
-  ].filter((value) => Boolean(value?.trim())).length;
-}
-
-function buildSummaryCards(journals: JournalRecord[], todayEntry: JournalRecord | null): JournalSummaryCard[] {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
-  const monthCount = journals.filter((journal) => {
-    const [year, month] = journal.journalDate.split('-').map(Number);
-    return year === currentYear && month === currentMonth;
-  }).length;
-  const filledCount = journals.filter((journal) => getCompletionCount(journal) >= 3).length;
 
   return [
-    { count: String(journals.length), icon: 'menu-book', iconTone: 'primary', key: 'all', label: 'All Entries', title: 'Total' },
-    { count: String(monthCount), icon: 'calendar-month', iconTone: 'secondary', key: 'month', label: 'This Month', title: 'Month' },
-    { count: String(filledCount), icon: 'auto-awesome', iconTone: 'tertiary', key: 'filled', label: 'Rich Notes', title: 'Filled' },
-    { count: todayEntry ? 'Ready' : 'Open', icon: 'today', iconTone: 'neutral', key: 'today', label: 'Today', title: 'Status' },
+    {
+      count: String(counts.total ?? 0),
+      filter: 'ALL',
+      icon: 'delete-sweep',
+      iconTone: 'primary',
+      label: 'All Items',
+      title: 'Total',
+    },
+    {
+      count: String(counts.JOURNAL ?? 0),
+      filter: 'JOURNAL',
+      icon: ENTITY_CONFIG.JOURNAL.icon,
+      iconTone: ENTITY_CONFIG.JOURNAL.tone,
+      label: 'Journal Entries',
+      title: 'Journal',
+    },
+    {
+      count: String(counts.TASK ?? 0),
+      filter: 'TASK',
+      icon: ENTITY_CONFIG.TASK.icon,
+      iconTone: ENTITY_CONFIG.TASK.tone,
+      label: 'Task Items',
+      title: 'Tasks',
+    },
+    {
+      count: String((counts.COVER ?? 0) + (counts.CONTRACT ?? 0) + (counts.SUPPORT_TICKET ?? 0)),
+      filter: 'COVER',
+      icon: 'inventory-2',
+      iconTone: 'secondary',
+      label: 'Other Records',
+      title: 'Other',
+    },
   ];
 }
 
@@ -133,26 +150,27 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function JournalsScreen() {
+export default function RecycleBinScreen() {
   const { logout, session } = useAuth();
   const { hasActiveSubscription, subscriptionLoading } = useSubscription();
   const { showToast } = useToast();
   const { height, width } = useWindowDimensions();
 
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [journals, setJournals] = useState<JournalRecord[]>([]);
-  const [todayEntry, setTodayEntry] = useState<JournalRecord | null>(null);
-  const [journalsLoading, setJournalsLoading] = useState(false);
-  const [journalSearch, setJournalSearch] = useState('');
-  const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
-  const [selectedJournal, setSelectedJournal] = useState<JournalRecord | null>(null);
-  const [journalDetailOpen, setJournalDetailOpen] = useState(false);
-  const [journalDetailLoading, setJournalDetailLoading] = useState(false);
-  const [journalActionMenuOpen, setJournalActionMenuOpen] = useState(false);
+  const [items, setItems] = useState<RecycleBinItemRecord[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<BinFilter>('ALL');
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<RecycleBinItemRecord | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const [restoreSubmitting, setRestoreSubmitting] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [actionMenuPosition, setActionMenuPosition] = useState<ActionMenuPosition>({ top: 0 });
-  const [infoModal, setInfoModal] = useState<InfoModalState>({
+  const [infoModal, setInfoModal] = useState({
     eyebrow: '',
     message: '',
     title: '',
@@ -162,36 +180,43 @@ export default function JournalsScreen() {
   const avatarLetter = ((session?.name?.trim() || session?.email || '?').slice(0, 1)).toUpperCase();
   const cardWidth = (width - spacing.marginMobile * 2 - spacing.md) / 2;
 
-  const filteredJournals = useMemo(() => {
-    const query = journalSearch.trim().toLowerCase();
+  const summaryCards = useMemo(() => buildSummaryCards(items), [items]);
+  const selectedItemFromList = useMemo(
+    () => items.find((item) => item.id === selectedItemId) ?? null,
+    [items, selectedItemId],
+  );
 
-    return journals.filter((journal) => {
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return items.filter((item) => {
+      if (filter !== 'ALL') {
+        if (filter === 'COVER') {
+          if (!['COVER', 'CONTRACT', 'SUPPORT_TICKET'].includes(item.entityType)) {
+            return false;
+          }
+        } else if (item.entityType !== filter) {
+          return false;
+        }
+      }
+
       if (!query) {
         return true;
       }
 
       return [
-        journal.journalDate,
-        journal.mood ?? '',
-        journal.thoughts ?? '',
-        journal.quoteOfTheDay ?? '',
-        journal.gratefulFor ?? '',
-        journal.affirmation ?? '',
-        journal.accomplishments ?? '',
+        item.displayTitle,
+        item.displayDescription ?? '',
+        item.entityType,
+        ENTITY_CONFIG[item.entityType].label,
       ]
         .join(' ')
         .toLowerCase()
         .includes(query);
     });
-  }, [journalSearch, journals]);
+  }, [filter, items, search]);
 
-  const summaryCards = useMemo(() => buildSummaryCards(journals, todayEntry), [journals, todayEntry]);
-  const selectedJournalFromList = useMemo(
-    () => journals.find((journal) => journal.id === selectedJournalId) ?? null,
-    [journals, selectedJournalId],
-  );
-
-  const loadJournals = useCallback(
+  const loadItems = useCallback(
     async (options?: { silent?: boolean }) => {
       if (!session?.accessToken) {
         return;
@@ -199,24 +224,19 @@ export default function JournalsScreen() {
 
       const silent = options?.silent ?? false;
       if (!silent) {
-        setJournalsLoading(true);
+        setItemsLoading(true);
       }
 
       try {
-        const [journalList, currentDay] = await Promise.all([
-          getJournals(session.accessToken, { page: 1, pageSize: 100 }),
-          getTodayJournal(session.accessToken),
-        ]);
-
-        setJournals(journalList.data);
-        setTodayEntry(currentDay);
+        const result = await getRecycleBinItems(session.accessToken, { page: 1, pageSize: 100 });
+        setItems(result.data);
       } catch (error) {
         if (!(error instanceof UnauthorizedError)) {
-          showToast(error instanceof Error ? error.message : 'Unable to load journal entries.', 'error');
+          showToast(error instanceof Error ? error.message : 'Unable to load recycle bin.', 'error');
         }
       } finally {
         if (!silent) {
-          setJournalsLoading(false);
+          setItemsLoading(false);
         }
       }
     },
@@ -226,13 +246,12 @@ export default function JournalsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!session?.accessToken) {
-        setJournals([]);
-        setTodayEntry(null);
+        setItems([]);
         return;
       }
 
-      loadJournals();
-    }, [loadJournals, session?.accessToken]),
+      loadItems();
+    }, [loadItems, session?.accessToken]),
   );
 
   if (!session) {
@@ -243,24 +262,24 @@ export default function JournalsScreen() {
     return <Redirect href="/billing" />;
   }
 
-  async function fetchJournalDetail(journalId: string) {
+  async function fetchItemDetail(itemId: string) {
     if (!session?.accessToken) {
       return null;
     }
 
-    setJournalDetailLoading(true);
+    setDetailLoading(true);
 
     try {
-      const journal = await getJournalById(session.accessToken, journalId);
-      setSelectedJournal(journal);
-      return journal;
+      const item = await getRecycleBinItemById(session.accessToken, itemId);
+      setSelectedItem(item);
+      return item;
     } catch (error) {
       if (!(error instanceof UnauthorizedError)) {
-        showToast(error instanceof Error ? error.message : 'Unable to load journal details.', 'error');
+        showToast(error instanceof Error ? error.message : 'Unable to load recycle-bin details.', 'error');
       }
       return null;
     } finally {
-      setJournalDetailLoading(false);
+      setDetailLoading(false);
     }
   }
 
@@ -269,26 +288,22 @@ export default function JournalsScreen() {
       router.replace('/dashboard');
       return;
     }
-
     if (key === 'journals') {
+      router.push('/journals');
       return;
     }
-
     if (key === 'tasks') {
       router.push('/tasks');
       return;
     }
-
     if (key === 'contracts') {
       router.push('/contracts');
       return;
     }
-
     if (key === 'covers') {
       router.push('/covers');
       return;
     }
-
     if (key === 'more') {
       setMoreMenuOpen((current) => !current);
     }
@@ -299,76 +314,74 @@ export default function JournalsScreen() {
     logout({ animated: true, redirectToLogin: true });
   }
 
-  function handleOpenCreate() {
-    if (todayEntry) {
-      router.push({
-        params: { id: todayEntry.id, mode: 'edit' },
-        pathname: '/journal-form',
-      });
-      return;
-    }
-
-    router.push('/journal-form');
-  }
-
-  function handleJournalPress(journalId: string, event: GestureResponderEvent) {
+  function handleItemPress(itemId: string, event: GestureResponderEvent) {
     const maxTop = Math.max(112, height - ACTION_MENU_HEIGHT - 112);
-    setSelectedJournalId(journalId);
-    setSelectedJournal(null);
+    setSelectedItemId(itemId);
+    setSelectedItem(null);
     setActionMenuPosition({
       top: Math.min(maxTop, Math.max(112, event.nativeEvent.pageY - 6)),
     });
-    setJournalActionMenuOpen(true);
+    setActionMenuOpen(true);
   }
 
-  async function handleViewJournal() {
-    if (!selectedJournalId) {
+  async function handleViewItem() {
+    if (!selectedItemId) {
       return;
     }
 
-    setJournalActionMenuOpen(false);
-    const journal = await fetchJournalDetail(selectedJournalId);
-
-    if (journal) {
-      setJournalDetailOpen(true);
+    setActionMenuOpen(false);
+    const item = await fetchItemDetail(selectedItemId);
+    if (item) {
+      setDetailOpen(true);
     }
   }
 
-  function handleEditJournal() {
-    if (!selectedJournalId) {
+  async function handleRestoreItem() {
+    if (!selectedItemId || !session?.accessToken || restoreSubmitting) {
       return;
     }
 
-    setJournalActionMenuOpen(false);
-    router.push({
-      params: { id: selectedJournalId, mode: 'edit' },
-      pathname: '/journal-form',
-    });
+    setActionMenuOpen(false);
+    setRestoreSubmitting(true);
+
+    try {
+      await restoreRecycleBinItem(session.accessToken, selectedItemId);
+      setDetailOpen(false);
+      setSelectedItemId(null);
+      setSelectedItem(null);
+      showToast('Item restored successfully.');
+      await loadItems({ silent: true });
+    } catch (error) {
+      if (!(error instanceof UnauthorizedError)) {
+        showToast(error instanceof Error ? error.message : 'Unable to restore item.', 'error');
+      }
+    } finally {
+      setRestoreSubmitting(false);
+    }
   }
 
   function handleDeletePrompt() {
-    setJournalActionMenuOpen(false);
+    setActionMenuOpen(false);
     setDeleteConfirmOpen(true);
   }
 
-  async function handleDeleteJournal() {
-    if (!selectedJournalId || !session?.accessToken) {
+  async function handlePermanentDelete() {
+    if (!selectedItemId || !session?.accessToken) {
       return;
     }
 
     setDeleteSubmitting(true);
-
     try {
-      await deleteJournal(session.accessToken, selectedJournalId);
+      await permanentlyDeleteRecycleBinItem(session.accessToken, selectedItemId);
       setDeleteConfirmOpen(false);
-      setSelectedJournalId(null);
-      setSelectedJournal(null);
-      setJournalDetailOpen(false);
-      showToast('Journal deleted successfully.');
-      await loadJournals({ silent: true });
+      setDetailOpen(false);
+      setSelectedItemId(null);
+      setSelectedItem(null);
+      showToast('Recycle-bin item deleted permanently.');
+      await loadItems({ silent: true });
     } catch (error) {
       if (!(error instanceof UnauthorizedError)) {
-        showToast(error instanceof Error ? error.message : 'Unable to delete journal.', 'error');
+        showToast(error instanceof Error ? error.message : 'Unable to delete item permanently.', 'error');
       }
     } finally {
       setDeleteSubmitting(false);
@@ -379,15 +392,13 @@ export default function JournalsScreen() {
     <>
       <FloatingPageShell
         avatarLetter={avatarLetter}
-        bottomSlot={<FloatingBottomNav activeKey={moreMenuOpen ? 'more' : 'journals'} onPress={handleBottomNavPress} />}
+        bottomSlot={<FloatingBottomNav activeKey="more" onPress={handleBottomNavPress} />}
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() =>
           setInfoModal({
-            eyebrow: 'Journal',
-            message: todayEntry
-              ? 'Today already has a journal entry. You can keep refining it from this workspace.'
-              : 'You do not have a journal entry for today yet. Use New entry to capture it.',
-            title: 'Daily journal',
+            eyebrow: 'Recycle Bin',
+            message: 'Restore soft-deleted items or permanently remove them from your workspace history.',
+            title: 'Recycle Bin',
             visible: true,
           })
         }
@@ -400,103 +411,109 @@ export default function JournalsScreen() {
           })
         }
         profileImageUrl={session.profileImageUrl}
-        refreshControl={<RefreshControl refreshing={journalsLoading} tintColor={palette.primary} onRefresh={() => loadJournals()} />}
+        refreshControl={<RefreshControl refreshing={itemsLoading} tintColor={palette.primary} onRefresh={() => loadItems()} />}
         scrollViewProps={{
           onScrollBeginDrag: () => {
             setMoreMenuOpen(false);
-            setJournalActionMenuOpen(false);
+            setActionMenuOpen(false);
           },
         }}
-        title="Journal">
+        title="Recycle Bin">
         <View style={styles.heroSection}>
           <View style={styles.heroHeaderRow}>
             <View style={styles.heroCopy}>
-              <Text style={styles.heroTitle}>Journal Entries</Text>
+              <Text style={styles.heroTitle}>Recycle Bin</Text>
               <Text style={styles.heroBody}>
-                Keep your daily reflections, gratitude, affirmation, and progress in one dedicated workspace.
+                Review removed records, restore what you need, or clear items permanently before auto-purge.
               </Text>
             </View>
-            <Pressable style={styles.addButton} onPress={handleOpenCreate}>
-              <MaterialIcons color={palette.white} name={todayEntry ? 'edit' : 'add'} size={18} />
-              <Text style={styles.addButtonText}>{todayEntry ? 'Edit today' : 'New entry'}</Text>
-            </Pressable>
+            <View style={styles.heroBadge}>
+              <MaterialIcons color={palette.white} name="delete-sweep" size={18} />
+              <Text style={styles.heroBadgeText}>{items.length} items</Text>
+            </View>
           </View>
         </View>
 
         <View style={styles.summaryGrid}>
-          {summaryCards.map((item) => (
+          {summaryCards.map((card) => (
             <SummaryCard
-              key={item.key}
-              count={item.count}
-              icon={item.icon}
-              iconTone={item.iconTone}
-              label={item.label}
+              active={filter === card.filter}
+              count={card.count}
+              icon={card.icon}
+              iconTone={card.iconTone}
+              key={card.filter}
+              label={card.label}
               style={{ width: cardWidth }}
-              title={item.title}
+              title={card.title}
+              onPress={() => setFilter(card.filter)}
             />
           ))}
         </View>
 
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>Journal Timeline</Text>
-            <Text style={styles.sectionCount}>{filteredJournals.length} visible</Text>
+            <Text style={styles.sectionLabel}>Deleted Items</Text>
+            <Text style={styles.sectionCount}>{filteredItems.length} visible</Text>
           </View>
 
           <View style={styles.searchBar}>
             <MaterialIcons color={palette.onSurfaceVariant} name="search" size={18} />
             <TextInput
-              placeholder="Search by date, mood, or journal notes"
+              placeholder="Search by title, description, or type"
               placeholderTextColor={palette.onSurfaceVariant}
               returnKeyType="search"
               style={styles.searchInput}
-              value={journalSearch}
-              onChangeText={setJournalSearch}
+              value={search}
+              onChangeText={setSearch}
             />
           </View>
 
           <View style={styles.listCard}>
-            {journalsLoading ? (
+            {itemsLoading ? (
               <View style={styles.emptyState}>
                 <ActivityIndicator color={palette.primary} size="small" />
-                <Text style={styles.emptyStateBody}>Loading your journal entries...</Text>
+                <Text style={styles.emptyStateBody}>Loading recycle-bin items...</Text>
               </View>
-            ) : filteredJournals.length ? (
-              filteredJournals.map((journal, index) => (
-                <Pressable
-                  key={journal.id}
-                  style={[styles.journalRow, index < filteredJournals.length - 1 ? styles.journalRowBorder : null]}
-                  onPress={(event) => handleJournalPress(journal.id, event)}>
-                  <View style={styles.journalRowLeft}>
-                    <View style={styles.journalDateBadge}>
-                      <MaterialIcons color={palette.primary} name="calendar-today" size={18} />
+            ) : filteredItems.length ? (
+              filteredItems.map((item, index) => {
+                const config = ENTITY_CONFIG[item.entityType];
+
+                return (
+                  <Pressable
+                    key={item.id}
+                    style={[styles.itemRow, index < filteredItems.length - 1 ? styles.itemRowBorder : null]}
+                    onPress={(event) => handleItemPress(item.id, event)}>
+                    <View style={styles.itemRowLeft}>
+                      <View style={[styles.itemIconWrap, iconToneStyles[config.tone]]}>
+                        <MaterialIcons color={iconColor[config.tone]} name={config.icon} size={20} />
+                      </View>
+                      <View style={styles.itemCopy}>
+                        <Text numberOfLines={1} style={styles.itemTitle}>{item.displayTitle}</Text>
+                        <Text numberOfLines={1} style={styles.itemSubtitle}>
+                          {item.displayDescription || `${config.label} removed from the active workspace.`}
+                        </Text>
+                        <Text style={styles.itemMeta}>
+                          {config.label} · Deleted {formatDateTime(item.deletedAt)}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.journalCopy}>
-                      <Text style={styles.journalDate}>{formatDate(journal.journalDate)}</Text>
-                      <Text numberOfLines={1} style={styles.journalPreview}>
-                        {getPreviewText(journal)}
-                      </Text>
-                      <Text style={styles.journalMeta}>
-                        {journal.mood?.trim() ? `Mood: ${journal.mood}` : `${getCompletionCount(journal)} sections filled`}
-                      </Text>
+                    <View style={styles.itemRight}>
+                      <View style={styles.daysPill}>
+                        <Text style={styles.daysPillText}>{getPurgeLabel(item.daysRemaining)}</Text>
+                      </View>
+                      <Text style={styles.purgeDate}>Purge {formatDateTime(item.purgeAfter)}</Text>
                     </View>
-                  </View>
-                  <View style={styles.journalRight}>
-                    <View style={styles.completionPill}>
-                      <Text style={styles.completionText}>{getCompletionCount(journal)}/6</Text>
-                    </View>
-                    <Text style={styles.journalUpdatedAt}>Updated {formatDateTime(journal.updatedAt)}</Text>
-                  </View>
-                </Pressable>
-              ))
+                  </Pressable>
+                );
+              })
             ) : (
               <View style={styles.emptyState}>
-                <MaterialIcons color={palette.primary} name="menu-book" size={28} />
-                <Text style={styles.emptyStateTitle}>No journal entries found</Text>
+                <MaterialIcons color={palette.primary} name="delete-sweep" size={28} />
+                <Text style={styles.emptyStateTitle}>Recycle bin is clear</Text>
                 <Text style={styles.emptyStateBody}>
-                  {journalSearch.trim()
-                    ? 'Try a different search term to find your notes.'
-                    : 'Create your first journal entry to start tracking your daily reflections.'}
+                  {search.trim()
+                    ? 'Try a different search term to find deleted items.'
+                    : 'Deleted covers, contracts, tasks, journals, and support tickets will appear here.'}
                 </Text>
               </View>
             )}
@@ -505,51 +522,52 @@ export default function JournalsScreen() {
 
         <View style={styles.promoCard}>
           <View style={styles.promoCopy}>
-            <Text style={styles.promoTitle}>Daily reflection rhythm</Text>
+            <Text style={styles.promoTitle}>Retention window</Text>
             <Text style={styles.promoBody}>
-              {todayEntry
-                ? 'Today already has an entry. Revisit it to sharpen your wins, gratitude, and direction.'
-                : 'A short journal entry each day helps keep your goals, mindset, and momentum visible.'}
+              Restored items return to their original module. Permanent delete removes them completely and cannot be undone.
             </Text>
           </View>
-          <MaterialIcons color="rgba(255,255,255,0.2)" name="auto-stories" size={140} style={styles.promoIcon} />
+          <MaterialIcons color="rgba(255,255,255,0.2)" name="restore-from-trash" size={136} style={styles.promoIcon} />
         </View>
       </FloatingPageShell>
 
       <AppModal
         frameStyle={styles.viewModalFrame}
-        title="Journal entry"
-        visible={journalDetailOpen}
-        onClose={() => setJournalDetailOpen(false)}>
-        {journalDetailLoading ? (
+        title="Recycle-bin item"
+        visible={detailOpen}
+        onClose={() => setDetailOpen(false)}>
+        {detailLoading ? (
           <View style={styles.modalLoadingState}>
             <ActivityIndicator color={palette.primary} size="small" />
-            <Text style={styles.modalLoadingText}>Loading journal details...</Text>
+            <Text style={styles.modalLoadingText}>Loading recycle-bin details...</Text>
           </View>
-        ) : selectedJournal ? (
+        ) : selectedItem ? (
           <View style={styles.modalSection}>
             <View style={styles.detailHeaderCard}>
-              <View style={styles.detailHeaderIconWrap}>
-                <MaterialIcons color={palette.primary} name="menu-book" size={20} />
+              <View style={[styles.detailHeaderIconWrap, iconToneStyles[ENTITY_CONFIG[selectedItem.entityType].tone]]}>
+                <MaterialIcons
+                  color={iconColor[ENTITY_CONFIG[selectedItem.entityType].tone]}
+                  name={ENTITY_CONFIG[selectedItem.entityType].icon}
+                  size={20}
+                />
               </View>
               <View style={styles.detailHeaderCopy}>
-                <Text style={styles.detailHeaderTitle}>{formatDate(selectedJournal.journalDate)}</Text>
-                <Text style={styles.detailHeaderMeta}>Updated {formatDateTime(selectedJournal.updatedAt)}</Text>
+                <Text style={styles.detailHeaderTitle}>{selectedItem.displayTitle}</Text>
+                <Text style={styles.detailHeaderMeta}>{ENTITY_CONFIG[selectedItem.entityType].label}</Text>
               </View>
             </View>
 
             <View style={styles.detailList}>
-              <DetailRow label="Mood" value={selectedJournal.mood || 'Not added'} />
-              <DetailRow label="Thoughts" value={selectedJournal.thoughts || 'Not added'} />
-              <DetailRow label="Quote of the day" value={selectedJournal.quoteOfTheDay || 'Not added'} />
-              <DetailRow label="Grateful for" value={selectedJournal.gratefulFor || 'Not added'} />
-              <DetailRow label="Affirmation" value={selectedJournal.affirmation || 'Not added'} />
-              <DetailRow label="Accomplishments" value={selectedJournal.accomplishments || 'Not added'} />
+              <DetailRow label="Description" value={selectedItem.displayDescription || 'Not available'} />
+              <DetailRow label="Deleted at" value={formatDateTime(selectedItem.deletedAt)} />
+              <DetailRow label="Purge after" value={formatDateTime(selectedItem.purgeAfter)} />
+              <DetailRow label="Days remaining" value={String(selectedItem.daysRemaining)} />
+              <DetailRow label="Retention days" value={String(selectedItem.retentionDays)} />
             </View>
           </View>
         ) : (
           <View style={styles.modalLoadingState}>
-            <Text style={styles.modalLoadingText}>Journal details are not available.</Text>
+            <Text style={styles.modalLoadingText}>Item details are not available.</Text>
           </View>
         )}
       </AppModal>
@@ -566,47 +584,54 @@ export default function JournalsScreen() {
             <Pressable
               style={[styles.modalButton, styles.deleteButton, deleteSubmitting ? styles.modalButtonDisabled : null]}
               disabled={deleteSubmitting}
-              onPress={handleDeleteJournal}>
+              onPress={handlePermanentDelete}>
               {deleteSubmitting ? (
                 <ActivityIndicator color={palette.onError} size="small" />
               ) : (
-                <Text style={[styles.modalButtonText, styles.deleteButtonText]}>Delete entry</Text>
+                <Text style={[styles.modalButtonText, styles.deleteButtonText]}>Delete forever</Text>
               )}
             </Pressable>
           </View>
         }
         frameStyle={styles.deleteModalFrame}
-        title="Delete journal?"
+        title="Delete permanently?"
         visible={deleteConfirmOpen}
         onClose={() => setDeleteConfirmOpen(false)}>
         <Text style={styles.modalIntro}>
-          This removes the selected journal entry from your active workspace and sends it to the recycle flow.
+          This permanently removes the selected item from the recycle bin and cannot be undone.
         </Text>
       </AppModal>
 
-      {journalActionMenuOpen && selectedJournalFromList ? (
+      {actionMenuOpen && selectedItemFromList ? (
         <>
-          <Pressable style={styles.actionMenuBackdrop} onPress={() => setJournalActionMenuOpen(false)} />
+          <Pressable style={styles.actionMenuBackdrop} onPress={() => setActionMenuOpen(false)} />
           <View style={[styles.actionMenu, { top: actionMenuPosition.top }]}>
-            <Pressable style={styles.actionMenuItem} onPress={handleViewJournal}>
+            <Pressable style={styles.actionMenuItem} onPress={handleViewItem}>
               <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
                 <MaterialIcons color={palette.primary} name="visibility" size={18} />
               </View>
               <Text style={styles.actionMenuTitle}>View</Text>
             </Pressable>
             <View style={styles.actionMenuSeparator} />
-            <Pressable style={styles.actionMenuItem} onPress={handleEditJournal}>
+            <Pressable
+              disabled={restoreSubmitting}
+              style={styles.actionMenuItem}
+              onPress={handleRestoreItem}>
               <View style={[styles.actionMenuIconWrap, styles.actionMenuIconPrimary]}>
-                <MaterialIcons color={palette.primary} name="edit" size={18} />
+                {restoreSubmitting ? (
+                  <ActivityIndicator color={palette.primary} size="small" />
+                ) : (
+                  <MaterialIcons color={palette.primary} name="restore" size={18} />
+                )}
               </View>
-              <Text style={styles.actionMenuTitle}>Edit</Text>
+              <Text style={styles.actionMenuTitle}>Restore</Text>
             </Pressable>
             <View style={styles.actionMenuSeparator} />
             <Pressable style={styles.actionMenuItem} onPress={handleDeletePrompt}>
               <View style={[styles.actionMenuIconWrap, styles.actionMenuIconDanger]}>
-                <MaterialIcons color={palette.error} name="delete-outline" size={18} />
+                <MaterialIcons color={palette.error} name="delete-forever" size={18} />
               </View>
-              <Text style={styles.actionMenuTitle}>Delete</Text>
+              <Text style={styles.actionMenuTitle}>Delete forever</Text>
             </Pressable>
           </View>
         </>
@@ -644,20 +669,6 @@ export default function JournalsScreen() {
                 <Text style={styles.moreMenuSubtitle}>Manage subscription and payments</Text>
               </View>
             </Pressable>
-            <Pressable
-              style={styles.moreMenuItem}
-              onPress={() => {
-                setMoreMenuOpen(false);
-                router.push('/recycle-bin');
-              }}>
-              <View style={styles.moreMenuIconWrap}>
-                <MaterialIcons color={palette.primary} name="delete-sweep" size={20} />
-              </View>
-              <View style={styles.moreMenuCopy}>
-                <Text style={styles.moreMenuTitle}>Recycle Bin</Text>
-                <Text style={styles.moreMenuSubtitle}>Restore or clear deleted records</Text>
-              </View>
-            </Pressable>
             <Pressable style={styles.moreMenuItem} onPress={handleLogout}>
               <View style={[styles.moreMenuIconWrap, styles.moreMenuIconWrapMuted]}>
                 <MaterialIcons color={palette.onSurface} name="logout" size={20} />
@@ -688,7 +699,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,92,171,0.08)',
     borderRadius: radius.lg,
     borderWidth: 1,
-    minWidth: 156,
+    minWidth: 168,
     padding: 6,
     position: 'absolute',
     right: spacing.marginMobile,
@@ -739,27 +750,13 @@ const styles = StyleSheet.create({
     fontSize: typography.label,
     fontWeight: '700',
   },
-  addButton: {
-    alignItems: 'center',
-    backgroundColor: palette.primary,
-    borderRadius: radius.pill,
-    flexDirection: 'row',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-  },
-  addButtonText: {
-    color: palette.white,
-    fontSize: typography.bodySmall,
-    fontWeight: '700',
-  },
-  completionPill: {
+  daysPill: {
     backgroundColor: 'rgba(0, 92, 171, 0.12)',
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
   },
-  completionText: {
+  daysPillText: {
     color: palette.primary,
     fontSize: typography.label,
     fontWeight: '700',
@@ -789,7 +786,6 @@ const styles = StyleSheet.create({
   },
   detailHeaderIconWrap: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 92, 171, 0.1)',
     borderRadius: radius.pill,
     height: 36,
     justifyContent: 'center',
@@ -840,6 +836,22 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '700',
   },
+  heroBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  heroBadgeText: {
+    color: palette.white,
+    fontSize: typography.bodySmall,
+    fontWeight: '700',
+  },
   heroBody: {
     color: 'rgba(255,255,255,0.84)',
     fontSize: typography.body,
@@ -865,57 +877,51 @@ const styles = StyleSheet.create({
     fontSize: typography.display,
     fontWeight: '700',
   },
-  journalCopy: {
+  itemCopy: {
     flex: 1,
     gap: spacing.xs,
   },
-  journalDate: {
-    color: palette.onSurface,
-    fontSize: typography.body,
-    fontWeight: '700',
-  },
-  journalDateBadge: {
+  itemIconWrap: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 92, 171, 0.1)',
     borderRadius: radius.pill,
     height: 42,
     justifyContent: 'center',
     width: 42,
   },
-  journalMeta: {
+  itemMeta: {
     color: palette.onSurfaceVariant,
     fontSize: typography.label,
   },
-  journalPreview: {
-    color: palette.onSurface,
-    fontSize: typography.bodySmall,
-  },
-  journalRight: {
+  itemRight: {
     alignItems: 'flex-end',
     gap: spacing.xs,
     maxWidth: '38%',
   },
-  journalRow: {
+  itemRow: {
     alignItems: 'flex-start',
     flexDirection: 'row',
     gap: spacing.sm,
     justifyContent: 'space-between',
     padding: spacing.md,
   },
-  journalRowBorder: {
+  itemRowBorder: {
     borderBottomColor: '#F1F5F9',
     borderBottomWidth: 1,
   },
-  journalRowLeft: {
+  itemRowLeft: {
     alignItems: 'flex-start',
     flex: 1,
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  journalUpdatedAt: {
-    color: palette.onSurfaceVariant,
-    fontSize: typography.label,
-    textAlign: 'right',
+  itemSubtitle: {
+    color: palette.onSurface,
+    fontSize: typography.bodySmall,
+  },
+  itemTitle: {
+    color: palette.onSurface,
+    fontSize: typography.body,
+    fontWeight: '700',
   },
   listCard: {
     backgroundColor: palette.surfaceContainerLowest,
@@ -1034,7 +1040,7 @@ const styles = StyleSheet.create({
     maxWidth: '72%',
   },
   promoCard: {
-    backgroundColor: '#0F766E',
+    backgroundColor: '#7C2D12',
     borderRadius: radius.lg,
     marginBottom: spacing.lg,
     marginHorizontal: spacing.marginMobile,
@@ -1056,6 +1062,11 @@ const styles = StyleSheet.create({
     color: palette.white,
     fontSize: typography.title,
     fontWeight: '700',
+  },
+  purgeDate: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.label,
+    textAlign: 'right',
   },
   searchBar: {
     alignItems: 'center',
@@ -1109,3 +1120,17 @@ const styles = StyleSheet.create({
     maxHeight: '75%',
   } as ViewStyle,
 });
+
+const iconToneStyles = StyleSheet.create({
+  neutral: { backgroundColor: 'rgba(230, 232, 234, 0.5)' },
+  primary: { backgroundColor: 'rgba(0, 92, 171, 0.1)' },
+  secondary: { backgroundColor: 'rgba(207, 225, 248, 0.3)' },
+  tertiary: { backgroundColor: 'rgba(181, 28, 0, 0.1)' },
+});
+
+const iconColor = {
+  neutral: palette.outline,
+  primary: palette.primary,
+  secondary: palette.onSecondaryContainer,
+  tertiary: palette.tertiary,
+};
