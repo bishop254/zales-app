@@ -929,6 +929,7 @@ export default function SupportTicketsScreen() {
               </View>
               <Text style={styles.actionMenuTitle}>View</Text>
             </Pressable>
+            <View style={styles.actionMenuSeparator} />
             <Pressable style={styles.actionMenuItem} onPress={handleViewTimeline}>
               <View style={[styles.actionMenuIconWrap, { backgroundColor: 'rgba(0,92,171,0.1)' }]}>
                 <MaterialIcons color={palette.primary} name="history" size={18} />
@@ -1317,14 +1318,19 @@ const styles = StyleSheet.create({
   actionMenuItem: {
     alignItems: 'center',
     backgroundColor: 'transparent',
-    borderColor: 'rgba(192,199,214,0.4)',
     borderRadius: radius.md,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 10,
     minHeight: 40,
     paddingHorizontal: 10,
     paddingVertical: 8,
+  },
+  actionMenuSeparator: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(192, 199, 214, 0.7)',
+    height: 1,
+    marginVertical: 2,
+    width: '75%',
   },
   actionMenuTitle: { color: palette.onSurface, flex: 1, fontSize: typography.label, fontWeight: '700' },
 
