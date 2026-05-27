@@ -324,13 +324,7 @@ export default function BillingScreen() {
             title: 'Notifications',
           })
         }
-        onProfilePress={() =>
-          openInfoModal({
-            eyebrow: 'Account',
-            message: `Signed in as ${session.email}`,
-            title: 'Account',
-          })
-        }
+        onProfilePress={() => router.push('/profile')}
         profileImageUrl={session.profileImageUrl}
         scrollViewProps={{ onScrollBeginDrag: () => setMoreMenuOpen(false) }}
         title="Billing">

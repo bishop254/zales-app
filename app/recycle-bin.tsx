@@ -402,14 +402,7 @@ export default function RecycleBinScreen() {
             visible: true,
           })
         }
-        onProfilePress={() =>
-          setInfoModal({
-            eyebrow: 'Account',
-            message: `Signed in as ${session.email}`,
-            title: 'Account',
-            visible: true,
-          })
-        }
+        onProfilePress={() => router.push('/profile')}
         profileImageUrl={session.profileImageUrl}
         refreshControl={<RefreshControl refreshing={itemsLoading} tintColor={palette.primary} onRefresh={() => loadItems()} />}
         scrollViewProps={{

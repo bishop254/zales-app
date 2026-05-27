@@ -397,14 +397,7 @@ export default function CoverFormScreen() {
             visible: true,
           })
         }
-        onProfilePress={() =>
-          setInfoModal({
-            eyebrow: 'Account',
-            message: `Signed in as ${session.email}`,
-            title: 'Account',
-            visible: true,
-          })
-        }
+        onProfilePress={() => router.push('/profile')}
         profileImageUrl={session.profileImageUrl}
         title={isEditMode ? 'Edit Cover' : 'Add Cover'}>
         <View style={styles.heroSection}>

@@ -420,14 +420,7 @@ export default function ContractFormScreen() {
             visible: true,
           })
         }
-        onProfilePress={() =>
-          setInfoModal({
-            eyebrow: 'Account',
-            message: `Signed in as ${session.email}`,
-            title: 'Account',
-            visible: true,
-          })
-        }
+        onProfilePress={() => router.push('/profile')}
         profileImageUrl={session.profileImageUrl}
         title={isEditMode ? 'Edit Contract' : 'Add Contract'}>
         <View style={styles.heroSection}>

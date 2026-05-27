@@ -108,11 +108,10 @@ export function DashboardSummaryAnalyticsCard({ card, onPress, style }: SummaryC
 
   return (
     <Pressable style={[styles.summaryCard, style]} onPress={onPress}>
-      <View style={[styles.summaryIconWrap, { backgroundColor: iconTint.bg }]}>
-        <MaterialIcons color={iconTint.color} name={iconName} size={22} />
-      </View>
-
       <View style={styles.summaryMetricRow}>
+        <View style={[styles.summaryIconWrap, { backgroundColor: iconTint.bg }]}>
+          <MaterialIcons color={iconTint.color} name={iconName} size={22} />
+        </View>
         <Text style={styles.summaryValue}>{card.value}</Text>
       </View>
 
@@ -227,15 +226,21 @@ export function TaskCompletionCard({ taskCompletion }: TaskCompletionCardProps) 
 export function ExpiringSoonChartCard({ expiringSoon }: ExpiringSoonChartCardProps) {
   return (
     <View style={styles.analyticsCard}>
-      <Text style={styles.tileTitle}>Expiring Soon</Text>
-      <Text style={styles.tileSubtitle}>Upcoming renewals</Text>
-      {expiringSoon && expiringSoon.buckets.length ? (
-        <>
-          <Text numberOfLines={1} style={styles.analyticsHighlight}>
+      <View style={styles.expiringSoonHeader}>
+        <View style={styles.expiringSoonHeaderCopy}>
+          <Text style={styles.tileTitle}>Expiring Soon</Text>
+          <Text style={styles.tileSubtitle}>Upcoming renewals</Text>
+        </View>
+        {expiringSoon ? (
+          <Text numberOfLines={1} style={styles.expiringSoonMeta}>
             {expiringSoon.total} items need review
           </Text>
-          <BarChart bars={expiringSoon.buckets.map((bucket) => ({ ...bucket, label: compactBucketLabel(bucket.label) }))} height={138} />
-        </>
+        ) : null}
+      </View>
+      {expiringSoon && expiringSoon.buckets.length ? (
+        <View style={styles.expiringSoonChartWrap}>
+          <BarChart bars={expiringSoon.buckets.map((bucket) => ({ ...bucket, label: formatExpiringSoonLabel(bucket.label) }))} height={138} />
+        </View>
       ) : (
         <EmptyAnalyticsState
           body="You do not have any policies or contracts that need immediate attention."
@@ -548,6 +553,32 @@ function compactBucketLabel(label: string) {
   return label.replace(' days', 'd').replace(' day', 'd');
 }
 
+function formatExpiringSoonLabel(label: string) {
+  const compactLabel = compactBucketLabel(label);
+
+  if (label === '0-7 days') {
+    return `Covers ${compactLabel}`;
+  }
+
+  if (label === '8-30 days') {
+    return `Covers + Contracts ${compactLabel}`;
+  }
+
+  if (label === '31+ days') {
+    return `Covers ${compactLabel}`;
+  }
+
+  if (label.toLowerCase().includes('contract')) {
+    return `Contracts ${compactLabel.replace(/contracts?\s*/i, '').trim()}`.trim();
+  }
+
+  if (label.toLowerCase().includes('cover')) {
+    return `Covers ${compactLabel.replace(/covers?\s*/i, '').trim()}`.trim();
+  }
+
+  return compactLabel;
+}
+
 function activityTagText(item: DashboardRecentActivity) {
   if (item.status) {
     return item.status;
@@ -681,7 +712,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 18,
   },
-  analyticsHighlight: { color: palette.onSurface, fontSize: 13, fontWeight: '700' },
   breakdownLabel: { color: palette.onSurfaceVariant, flexShrink: 1, fontSize: 13 },
   breakdownLabelRow: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: spacing.xs },
   breakdownList: { flex: 1, gap: spacing.sm, justifyContent: 'center' },
@@ -689,7 +719,13 @@ const styles = StyleSheet.create({
   breakdownValue: { color: palette.onSurface, fontSize: typography.bodySmall, fontWeight: '700' },
   cardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   cardMenuRow: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
-  categoryLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
+  categoryLegend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    justifyContent: 'center',
+    marginTop: spacing.xs,
+  },
   combinedHealthCard: {
     backgroundColor: palette.surfaceContainerLowest,
     borderRadius: 22,
@@ -707,6 +743,27 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   completionRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  expiringSoonHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
+  expiringSoonHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  expiringSoonChartWrap: {
+    marginTop: spacing.xs,
+  },
+  expiringSoonMeta: {
+    color: palette.onSurface,
+    flexShrink: 0,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingTop: 2,
+    textAlign: 'right',
+  },
   emptyAnalytics: {
     alignItems: 'center',
     backgroundColor: 'rgba(246,249,255,0.96)',
@@ -889,7 +946,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 38,
   },
-  summaryMetricRow: { marginTop: spacing.xs },
+  summaryMetricRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
   summarySubtitle: { color: palette.onSurfaceVariant, fontSize: 13, marginTop: 2 },
   summaryTitle: { color: palette.onSurface, fontSize: 15, fontWeight: '600', marginTop: spacing.xs },
   summaryTrendRow: {

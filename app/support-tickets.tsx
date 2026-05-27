@@ -440,7 +440,7 @@ export default function SupportTicketsScreen() {
         bottomSlot={<FloatingBottomNav activeKey={moreMenuOpen ? 'more' : 'support-tickets'} onPress={handleBottomNavPress} />}
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() => {}}
-        onProfilePress={() => setInfoModal({ eyebrow: 'Account', message: `Signed in as ${session.email}`, title: 'Account', visible: true })}
+        onProfilePress={() => router.push('/profile')}
         profileImageUrl={session.profileImageUrl}
         refreshControl={
           <RefreshControl refreshing={ticketsLoading} tintColor={palette.primary} onRefresh={() => loadTickets()} />

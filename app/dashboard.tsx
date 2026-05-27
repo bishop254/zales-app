@@ -6,7 +6,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   ImageBackground,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -46,7 +45,6 @@ type AdminAudienceMode = 'all_users' | 'specific_user';
 
 const SUMMARY_CARD_KEYS = ['tasks', 'contracts', 'covers', 'journals'];
 const PERFORMANCE_RANGE_OPTIONS = [3, 5, 7] as const;
-
 export default function DashboardScreen() {
   const { logout, session } = useAuth();
   const { showToast } = useToast();
@@ -132,6 +130,7 @@ export default function DashboardScreen() {
   }, [analytics?.actionNeeded?.total, analytics?.summaryCards, analytics?.supportHealth?.openTickets, isAdmin]);
 
   const summaryPages = Math.max(1, Math.ceil(summaryCards.length / 2));
+  const recentActivityPreview = useMemo(() => (analytics?.recentActivity ?? []).slice(0, 4), [analytics?.recentActivity]);
 
   const welcomeTitle = useMemo(() => {
     if (!isAdmin) {
@@ -149,7 +148,7 @@ export default function DashboardScreen() {
     adminMode === 'all_users' ? 'All Users' : selectedAdminUser ? selectedAdminUser.email : 'Specific User';
   const hasDashboardContent =
     summaryCards.length > 0 ||
-    (analytics?.recentActivity?.length ?? 0) > 0 ||
+    recentActivityPreview.length > 0 ||
     (analytics?.performanceOutlook.weeklyActivity.length ?? 0) > 0 ||
     Boolean(analytics?.performanceOutlook.taskCompletion) ||
     Boolean(analytics?.performanceOutlook.expiringSoon?.buckets.length) ||
@@ -373,7 +372,7 @@ export default function DashboardScreen() {
   }
 
   function handleProfilePress() {
-    Alert.alert('Account', `Signed in as ${session.email}`);
+    router.push('/profile');
   }
 
   function handleAdminModeChange(mode: AdminAudienceMode) {
@@ -583,9 +582,9 @@ export default function DashboardScreen() {
               <View style={[styles.sectionSkeleton, styles.recentActivitySkeleton]} />
             ) : (
               <RecentActivityList
-                items={analytics?.recentActivity ?? []}
+                items={recentActivityPreview}
                 onItemPress={handleRecentActivityPress}
-                onViewAll={() => routeToModule(undefined, analytics?.recentActivity?.[0]?.type)}
+                onViewAll={() => router.push('/profile')}
               />
             )}
           </View>

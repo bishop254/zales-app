@@ -57,13 +57,53 @@ function toTrendDirection(value?: number | null): TrendDirection {
   return value > 0 ? 'up' : value < 0 ? 'down' : 'neutral';
 }
 
+function normalizeActivityType(
+  rawType?: string | null,
+  route?: string | null,
+): DashboardRecentActivity['type'] {
+  const compactType = (rawType ?? '')
+    .trim()
+    .replace(/[^a-zA-Z]/g, '')
+    .toUpperCase();
+  const compactRoute = (route ?? '')
+    .trim()
+    .replace(/[^a-zA-Z]/g, '')
+    .toUpperCase();
+
+  if (compactType === 'TASK' || compactRoute.includes('TASK')) {
+    return 'TASK';
+  }
+
+  if (compactType === 'CONTRACT' || compactRoute.includes('CONTRACT')) {
+    return 'CONTRACT';
+  }
+
+  if (compactType === 'COVER' || compactRoute.includes('COVER')) {
+    return 'COVER';
+  }
+
+  if (compactType === 'JOURNAL' || compactRoute.includes('JOURNAL')) {
+    return 'JOURNAL';
+  }
+
+  if (compactType === 'SUPPORTTICKET' || compactType === 'TICKET' || compactRoute.includes('SUPPORT')) {
+    return 'SUPPORT_TICKET';
+  }
+
+  if (compactType === 'BILLING' || compactType === 'SUBSCRIPTION' || compactRoute.includes('BILLING')) {
+    return 'BILLING';
+  }
+
+  return 'SYSTEM';
+}
+
 function normalizeRecentActivity(activity: DashboardRecentActivity[]): DashboardRecentActivity[] {
   return activity.map((item) => ({
     ...item,
     createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : undefined,
     status: item.status ?? null,
     subtitle: item.subtitle ?? '',
-    type: (item.type || 'SYSTEM') as DashboardRecentActivity['type'],
+    type: normalizeActivityType(item.type, item.route),
   }));
 }
 

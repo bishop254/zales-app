@@ -393,14 +393,7 @@ export default function JournalsScreen() {
 
           router.push('/journal-form');
         }}
-        onProfilePress={() =>
-          setInfoModal({
-            eyebrow: 'Account',
-            message: `Signed in as ${session.email}`,
-            title: 'Account',
-            visible: true,
-          })
-        }
+        onProfilePress={() => router.push('/profile')}
         profileImageUrl={session.profileImageUrl}
         refreshControl={<RefreshControl refreshing={journalsLoading} tintColor={palette.primary} onRefresh={() => loadJournals()} />}
         scrollViewProps={{

@@ -601,14 +601,7 @@ export default function TasksScreen() {
         notificationCount={notificationItems.length}
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() => setNotificationsOpen(true)}
-        onProfilePress={() =>
-          setInfoModal({
-            eyebrow: 'Account',
-            message: `Signed in as ${session.email}`,
-            title: 'Account',
-            visible: true,
-          })
-        }
+        onProfilePress={() => router.push('/profile')}
         profileImageUrl={session.profileImageUrl}
         refreshControl={<RefreshControl refreshing={tasksLoading} onRefresh={() => loadTasks()} />}
         scrollViewProps={{

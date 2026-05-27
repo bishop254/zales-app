@@ -23,6 +23,8 @@ export default function RootLayout() {
               <Stack.Screen name="set-password" />
               <Stack.Screen name="verify" />
               <Stack.Screen name="dashboard" />
+              <Stack.Screen name="profile" />
+              <Stack.Screen name="change-password" />
               <Stack.Screen name="billing" />
               <Stack.Screen name="tasks" />
               <Stack.Screen name="task-form" />

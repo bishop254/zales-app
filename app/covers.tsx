@@ -650,14 +650,7 @@ export default function CoversScreen() {
         notificationCount={totalNotificationCount}
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() => setNotificationsOpen(true)}
-        onProfilePress={() =>
-          setInfoModal({
-            eyebrow: 'Account',
-            message: `Signed in as ${session.email}`,
-            title: 'Account',
-            visible: true,
-          })
-        }
+        onProfilePress={() => router.push('/profile')}
         profileImageUrl={session.profileImageUrl}
         refreshControl={
           <RefreshControl

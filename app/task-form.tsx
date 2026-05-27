@@ -598,14 +598,7 @@ export default function TaskFormScreen() {
             visible: true,
           })
         }
-        onProfilePress={() =>
-          setInfoModal({
-            eyebrow: 'Account',
-            message: `Signed in as ${session.email}`,
-            title: 'Account',
-            visible: true,
-          })
-        }
+        onProfilePress={() => router.push('/profile')}
         profileImageUrl={session.profileImageUrl}
         title={isEditMode ? 'Edit task' : 'Add task'}>
         <View style={styles.heroSection}>
