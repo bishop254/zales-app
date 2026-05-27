@@ -52,10 +52,10 @@ export const dashboardShortcuts: DashboardShortcut[] = [
   {
     badge: '2',
     badgeTone: 'neutral',
-    eyebrow: 'Tickets',
-    icon: 'contact-support',
+    eyebrow: 'Daily Log',
+    icon: 'menu-book',
     iconTone: 'neutral',
-    title: 'Support',
+    title: 'Journal Entries',
   },
 ];
 

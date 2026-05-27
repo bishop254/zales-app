@@ -24,7 +24,7 @@ import { UnauthorizedError } from '@/features/api/auth-session';
 import { getContracts } from '@/features/contracts/contracts-api';
 import { getCovers } from '@/features/covers/covers-api';
 import { dashboardShortcuts, recentActivity } from '@/features/dashboard/data';
-import { getSupportTickets } from '@/features/support-tickets/support-tickets-api';
+import { getJournals } from '@/features/journal/journal-api';
 import { getTasks } from '@/features/tasks/tasks-api';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
@@ -38,7 +38,7 @@ export default function DashboardScreen() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [contractsCount, setContractsCount] = useState(0);
   const [coversCount, setCoversCount] = useState(0);
-  const [ticketsCount, setTicketsCount] = useState(0);
+  const [journalsCount, setJournalsCount] = useState(0);
   const [tasksCount, setTasksCount] = useState(0);
   const { width } = useWindowDimensions();
 
@@ -53,7 +53,7 @@ export default function DashboardScreen() {
       if (!session?.accessToken || subscriptionLoading || !hasActiveSubscription) {
         setContractsCount(0);
         setCoversCount(0);
-        setTicketsCount(0);
+        setJournalsCount(0);
         setTasksCount(0);
         return;
       }
@@ -63,10 +63,10 @@ export default function DashboardScreen() {
 
       async function loadDashboardCounts() {
         try {
-          const [contracts, covers, tickets, tasks] = await Promise.all([
+          const [contracts, covers, journals, tasks] = await Promise.all([
             getContracts(accessToken),
             getCovers(accessToken),
-            getSupportTickets(accessToken),
+            getJournals(accessToken, { page: 1, pageSize: 100 }),
             getTasks(accessToken, { page: 1, pageSize: 1 }),
           ]);
 
@@ -76,7 +76,7 @@ export default function DashboardScreen() {
 
           setContractsCount(contracts.length);
           setCoversCount(covers.length);
-          setTicketsCount(tickets.length);
+          setJournalsCount(journals.meta.totalItems);
           setTasksCount(tasks.meta.totalItems);
         } catch (error) {
           if (!active || error instanceof UnauthorizedError) {
@@ -109,8 +109,8 @@ export default function DashboardScreen() {
       return { ...item, badge: String(coversCount) };
     }
 
-    if (item.title === 'Support' || item.icon === 'contact-support') {
-      return { ...item, badge: String(ticketsCount) };
+    if (item.title === 'Journal Entries' || item.icon === 'menu-book') {
+      return { ...item, badge: String(journalsCount) };
     }
 
     if (item.title === 'Tasks' || item.icon === 'assignment') {
@@ -184,8 +184,8 @@ export default function DashboardScreen() {
       return;
     }
 
-    if (item.title === 'Support' || item.icon === 'contact-support') {
-      router.push('/support-tickets');
+    if (item.title === 'Journal Entries' || item.icon === 'menu-book') {
+      router.push('/journals');
       return;
     }
 

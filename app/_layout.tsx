@@ -30,6 +30,8 @@ export default function RootLayout() {
               <Stack.Screen name="contract-form" />
               <Stack.Screen name="covers" />
               <Stack.Screen name="cover-form" />
+              <Stack.Screen name="journals" />
+              <Stack.Screen name="journal-form" />
               <Stack.Screen name="support-tickets" />
               <Stack.Screen name="support-ticket-form" />
             </Stack>
