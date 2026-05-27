@@ -48,7 +48,7 @@ export function SummaryCard({
         </View>
         <Text style={styles.summaryCount}>{count}</Text>
       </View>
-      <View>
+      <View style={styles.summaryFooter}>
         <Text style={styles.summaryLabel}>{label}</Text>
         <Text style={styles.summaryTitle}>{title}</Text>
       </View>
@@ -63,10 +63,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: 1,
     elevation: 8,
-    height: 132,
-    justifyContent: 'space-between',
+    height: 124,
+    justifyContent: 'flex-start',
     overflow: 'hidden',
-    padding: spacing.sm + 2,
+    padding: spacing.sm,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.1,
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   },
   summaryCount: {
     color: palette.onSurface,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
   },
   summaryHeader: {
@@ -86,23 +86,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  summaryFooter: {
+    marginTop: spacing.sm + 2,
+  },
   summaryIconWrap: {
     alignItems: 'center',
     borderRadius: radius.xl,
-    height: 42,
+    height: 38,
     justifyContent: 'center',
-    width: 42,
+    width: 38,
   },
   summaryLabel: {
     color: palette.onSurfaceVariant,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   summaryTitle: {
     color: palette.onSurface,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
   },
 });

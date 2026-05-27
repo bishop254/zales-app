@@ -1020,12 +1020,12 @@ const styles = StyleSheet.create({
   addButtonText: { color: palette.white, fontSize: typography.bodySmall, fontWeight: '700' },
 
   summaryGrid: {
-    columnGap: spacing.md,
+    columnGap: spacing.sm,
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: -4,
     paddingHorizontal: spacing.marginMobile,
-    rowGap: spacing.md,
+    rowGap: spacing.sm,
   },
 
   sectionBlock: { gap: spacing.md, marginTop: spacing.lg, paddingHorizontal: spacing.marginMobile },

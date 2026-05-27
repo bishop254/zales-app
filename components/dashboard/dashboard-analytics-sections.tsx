@@ -1,0 +1,958 @@
+import { MaterialIcons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
+
+import { AreaLineChart } from '@/components/charts/area-line-chart';
+import { BarChart } from '@/components/charts/bar-chart';
+import { DonutChart } from '@/components/charts/donut-chart';
+import { GroupedBarChart } from '@/components/charts/grouped-bar-chart';
+import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import type {
+  DashboardAnalyticsResponse,
+  DashboardRecentActivity,
+  DashboardSummaryCard,
+  TrendDirection,
+} from '@/features/analytics/analytics-types';
+
+type SummaryCardProps = {
+  card: DashboardSummaryCard;
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+};
+
+type RecentActivityListProps = {
+  items: DashboardRecentActivity[];
+  onItemPress: (item: DashboardRecentActivity) => void;
+  onViewAll?: () => void;
+};
+
+type PerformanceOutlookCardProps = {
+  analytics: DashboardAnalyticsResponse['performanceOutlook'];
+  chartWidth: number;
+  onRangePress: () => void;
+  rangeLabel: string;
+};
+
+type TaskCompletionCardProps = {
+  taskCompletion?: DashboardAnalyticsResponse['performanceOutlook']['taskCompletion'];
+};
+
+type ExpiringSoonChartCardProps = {
+  expiringSoon?: DashboardAnalyticsResponse['performanceOutlook']['expiringSoon'];
+};
+
+type StatusDistributionCardProps = {
+  cards: DashboardSummaryCard[];
+  chartWidth: number;
+};
+
+type ActionNeededCardProps = {
+  actionNeeded?: DashboardAnalyticsResponse['actionNeeded'];
+  onRoutePress: (route?: string) => void;
+};
+
+type SubscriptionCardProps = {
+  subscription?: DashboardAnalyticsResponse['subscription'];
+};
+
+type SupportHealthCardProps = {
+  supportHealth?: DashboardAnalyticsResponse['supportHealth'];
+};
+
+type CombinedHealthCardProps = {
+  subscription?: DashboardAnalyticsResponse['subscription'];
+  supportHealth?: DashboardAnalyticsResponse['supportHealth'];
+};
+
+type EmptyAnalyticsStateProps = {
+  body?: string;
+  icon?: keyof typeof MaterialIcons.glyphMap;
+  label: string;
+  size?: 'compact' | 'default' | 'tall';
+};
+
+const summaryIconMap: Record<string, keyof typeof MaterialIcons.glyphMap> = {
+  book: 'menu-book',
+  clipboard: 'assignment',
+  'contact-support': 'contact-support',
+  document: 'description',
+  people: 'groups',
+  shield: 'shield',
+  'verified-user': 'verified-user',
+};
+
+const summaryIconTintMap: Record<string, { bg: string; color: string }> = {
+  book: { bg: 'rgba(147,51,234,0.12)', color: '#7C3AED' },
+  clipboard: { bg: 'rgba(0,92,171,0.1)', color: palette.primary },
+  'contact-support': { bg: 'rgba(249,115,22,0.12)', color: '#EA580C' },
+  document: { bg: 'rgba(100,116,139,0.12)', color: '#64748B' },
+  shield: { bg: 'rgba(0,92,171,0.1)', color: palette.primary },
+};
+
+function trendStyles(direction?: TrendDirection) {
+  if (direction === 'up') {
+    return { bg: 'rgba(22,163,74,0.1)', color: '#16A34A', icon: 'arrow-upward' as const };
+  }
+
+  if (direction === 'down') {
+    return { bg: 'rgba(239,68,68,0.1)', color: '#EF4444', icon: 'arrow-downward' as const };
+  }
+
+  return { bg: 'rgba(100,116,139,0.12)', color: '#64748B', icon: 'remove' as const };
+}
+
+export function DashboardSummaryAnalyticsCard({ card, onPress, style }: SummaryCardProps) {
+  const iconName = summaryIconMap[card.icon ?? ''] ?? 'insights';
+  const iconTint = summaryIconTintMap[card.icon ?? ''] ?? { bg: 'rgba(0,92,171,0.1)', color: palette.primary };
+  const trend = trendStyles(card.trendDirection);
+
+  return (
+    <Pressable style={[styles.summaryCard, style]} onPress={onPress}>
+      <View style={[styles.summaryIconWrap, { backgroundColor: iconTint.bg }]}>
+        <MaterialIcons color={iconTint.color} name={iconName} size={22} />
+      </View>
+
+      <View style={styles.summaryMetricRow}>
+        <Text style={styles.summaryValue}>{card.value}</Text>
+      </View>
+
+      <Text numberOfLines={1} style={styles.summaryTitle}>
+        {card.label}
+      </Text>
+
+      <Text numberOfLines={1} style={styles.summarySubtitle}>
+        {card.subtitle ?? card.category}
+      </Text>
+
+      <View style={[styles.summaryTrendRow, { backgroundColor: trend.bg }]}>
+        <MaterialIcons color={trend.color} name={trend.icon} size={13} />
+        <Text numberOfLines={1} style={[styles.summaryTrendText, { color: trend.color }]}>
+          {card.trendPercentage ? `${Math.abs(card.trendPercentage)}%` : '0%'}
+          {card.trendDirection === 'neutral' ? ' stable' : ' vs last week'}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+export function PerformanceOutlookCard({
+  analytics,
+  chartWidth,
+  onRangePress,
+  rangeLabel,
+}: PerformanceOutlookCardProps) {
+  const overall = analytics.overallActivity;
+  const totalActivity = analytics.weeklyActivity.reduce(
+    (sum, item) => sum + Math.max(item.completed ?? item.count ?? item.created ?? 0, 0),
+    0,
+  );
+
+  return (
+    <View style={styles.sectionCard}>
+      <View style={styles.performanceHeader}>
+        <View style={styles.performanceHeading}>
+          <View style={styles.performanceIconWrap}>
+            <MaterialIcons color={palette.primary} name="trending-up" size={18} />
+          </View>
+          <View style={styles.performanceHeadingCopy}>
+            <Text numberOfLines={1} style={styles.sectionCardTitle}>
+              Performance Outlook
+            </Text>
+            <Text numberOfLines={1} style={styles.sectionCardBody}>
+              {overall?.label ?? 'Weekly performance overview'}
+            </Text>
+          </View>
+        </View>
+
+        <Pressable style={styles.performancePill} onPress={onRangePress}>
+          <Text numberOfLines={1} style={styles.performancePillText}>
+            {rangeLabel}
+          </Text>
+          <MaterialIcons color={palette.onSurfaceVariant} name="arrow-drop-down" size={18} />
+        </Pressable>
+      </View>
+
+      <AreaLineChart data={analytics.weeklyActivity} height={186} width={chartWidth} />
+
+      <View style={styles.performanceFooter}>
+        <LegendDot color={palette.primaryContainer} label="Completed Items" />
+        <Text style={styles.performanceTotal}>Total: {overall?.value ?? totalActivity}</Text>
+      </View>
+    </View>
+  );
+}
+
+export function TaskCompletionCard({ taskCompletion }: TaskCompletionCardProps) {
+  if (!taskCompletion) {
+    return (
+      <View style={styles.analyticsCard}>
+        <Text style={styles.tileTitle}>Task Completion Rate</Text>
+        <Text style={styles.tileSubtitle}>This Week</Text>
+        <EmptyAnalyticsState
+          body="As you complete more work, your weekly completion score will show up here."
+          icon="donut-large"
+          label="No completion insights yet"
+        />
+      </View>
+    );
+  }
+
+  const completedPercent = taskCompletion.completionRate;
+  const inProgressPercent = taskCompletion.total > 0 ? Math.round(((taskCompletion.inProgress ?? 0) / taskCompletion.total) * 100) : 0;
+  const overduePercent = taskCompletion.total > 0 ? Math.round(((taskCompletion.overdue ?? 0) / taskCompletion.total) * 100) : 0;
+
+  return (
+    <View style={styles.analyticsCard}>
+      <Text style={styles.tileTitle}>Task Completion Rate</Text>
+      <Text style={styles.tileSubtitle}>This Week</Text>
+
+      <View style={styles.completionRow}>
+        <DonutChart label="completed" size={120} strokeWidth={13} value={taskCompletion.completionRate} />
+
+        <View style={styles.breakdownList}>
+          <BreakdownRow color={palette.primaryContainer} label="Completed" value={`${completedPercent}%`} />
+          <BreakdownRow color="#93C5FD" label="In Progress" value={`${inProgressPercent}%`} />
+          <BreakdownRow color="#D1D5DB" label="Overdue" value={`${overduePercent}%`} />
+        </View>
+      </View>
+
+      <View style={styles.successPill}>
+        <MaterialIcons color="#16A34A" name="trending-up" size={15} />
+        <Text style={styles.successPillText}>{taskCompletion.completionRate}% completed</Text>
+      </View>
+    </View>
+  );
+}
+
+export function ExpiringSoonChartCard({ expiringSoon }: ExpiringSoonChartCardProps) {
+  return (
+    <View style={styles.analyticsCard}>
+      <Text style={styles.tileTitle}>Expiring Soon</Text>
+      <Text style={styles.tileSubtitle}>Upcoming renewals</Text>
+      {expiringSoon && expiringSoon.buckets.length ? (
+        <>
+          <Text numberOfLines={1} style={styles.analyticsHighlight}>
+            {expiringSoon.total} items need review
+          </Text>
+          <BarChart bars={expiringSoon.buckets.map((bucket) => ({ ...bucket, label: compactBucketLabel(bucket.label) }))} height={138} />
+        </>
+      ) : (
+        <EmptyAnalyticsState
+          body="You do not have any policies or contracts that need immediate attention."
+          icon="event-available"
+          label="Nothing is expiring soon"
+        />
+      )}
+    </View>
+  );
+}
+
+export function StatusDistributionCard({ cards, chartWidth }: StatusDistributionCardProps) {
+  const items = cards.slice(0, 4).map((card) => ({
+    color:
+      card.key.includes('journal')
+        ? '#7C3AED'
+        : card.key.includes('contract')
+          ? '#64748B'
+          : card.key.includes('cover')
+            ? '#2563EB'
+            : '#0EA5E9',
+    label: shortLabel(card.label),
+    value: card.value,
+  }));
+
+  return (
+    <View style={styles.analyticsCard}>
+      <View style={styles.cardMenuRow}>
+        <View>
+          <Text style={styles.tileTitle}>Workspace Activity</Text>
+          <Text style={styles.tileSubtitle}>By category</Text>
+        </View>
+      </View>
+
+      {items.length ? (
+        <>
+          <GroupedBarChart items={items} width={chartWidth - spacing.md * 2} />
+          <View style={styles.categoryLegend}>
+            {items.map((item) => (
+              <LegendDot key={item.label} color={item.color} label={item.label} />
+            ))}
+          </View>
+        </>
+      ) : (
+        <EmptyAnalyticsState
+          body="Once tasks, contracts, covers, and journals start moving, we will map the trend here."
+          icon="insights"
+          label="No category activity available"
+        />
+      )}
+    </View>
+  );
+}
+
+export function ActionNeededCard({ actionNeeded, onRoutePress }: ActionNeededCardProps) {
+  if (!actionNeeded || actionNeeded.total <= 0) {
+    return null;
+  }
+
+  return (
+    <View style={[styles.sectionCard, styles.warningCard]}>
+      <View style={styles.sectionCardHeader}>
+        <Text style={styles.sectionCardTitle}>Action Needed</Text>
+        <View style={styles.warningPill}>
+          <Text style={styles.warningPillText}>{actionNeeded.total}</Text>
+        </View>
+      </View>
+
+      <View style={styles.actionList}>
+        {actionNeeded.items.map((item) => (
+          <Pressable key={`${item.type}-${item.title}`} style={styles.actionRow} onPress={() => onRoutePress(item.route)}>
+            <View style={styles.actionIconWrap}>
+              <MaterialIcons color={palette.error} name="priority-high" size={18} />
+            </View>
+            <View style={styles.actionCopy}>
+              <Text style={styles.actionTitle}>{item.title}</Text>
+              <Text style={styles.actionSubtitle}>{item.subtitle ?? 'Needs attention'}</Text>
+            </View>
+            <MaterialIcons color={palette.error} name="chevron-right" size={20} />
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
+  if (!subscription) {
+    return null;
+  }
+
+  const daysRemaining = subscription.daysRemaining ?? 0;
+  const progress = Math.max(0, Math.min(100, Math.round((daysRemaining / Math.max(daysRemaining, 365)) * 100)));
+
+  return (
+    <View style={styles.featureCard}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.featureTitle}>Subscription</Text>
+        <View style={styles.planPill}>
+          <Text style={styles.planPillText}>{subscription.planName ?? subscription.status}</Text>
+        </View>
+      </View>
+
+      <View style={styles.featureBodyRow}>
+        <View style={styles.featureIconWrap}>
+          <MaterialIcons color={palette.primary} name="workspace-premium" size={24} />
+        </View>
+
+        <View style={styles.featureBodyCopy}>
+          <Text style={styles.featureMetaLabel}>Plan valid until</Text>
+          <Text numberOfLines={1} style={styles.featureMetaValue}>
+            {subscription.validUntil ?? subscription.status}
+          </Text>
+          <Text numberOfLines={1} style={styles.featureMetaHint}>
+            You&apos;re on the annual plan.
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.featureBadgeRow}>
+        <View style={styles.statusBadge}>
+          <MaterialIcons color="#16A34A" name="check-circle" size={15} />
+          <Text style={styles.statusBadgeText}>{subscription.status}</Text>
+        </View>
+      </View>
+
+      <View style={styles.progressRow}>
+        <Text numberOfLines={1} style={styles.progressText}>
+          {daysRemaining} days remaining
+        </Text>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${progress}%` }]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export function SupportHealthCard({ supportHealth }: SupportHealthCardProps) {
+  if (!supportHealth) {
+    return null;
+  }
+
+  return (
+    <View style={styles.featureCard}>
+      <Text style={styles.featureTitle}>Support Health</Text>
+      <View style={styles.supportHeader}>
+        <View style={styles.supportIconWrap}>
+          <MaterialIcons color="#16A34A" name="favorite" size={20} />
+        </View>
+        <View style={styles.supportCopy}>
+          <Text numberOfLines={1} style={styles.supportStatus}>
+            {supportHealth.status}
+          </Text>
+          <Text style={styles.featureMetaLabel}>Average response time</Text>
+          <Text numberOfLines={2} style={styles.supportTime}>
+            {supportHealth.averageResponseTime ?? 'Not available'}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.supportPill}>
+        <MaterialIcons color="#16A34A" name="check-circle" size={15} />
+        <Text numberOfLines={1} style={styles.supportPillText}>
+          {supportHealth.openTickets ?? 0} open tickets
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+export function CombinedHealthCard({ subscription, supportHealth }: CombinedHealthCardProps) {
+  if (!subscription && !supportHealth) {
+    return null;
+  }
+
+  return (
+    <View style={styles.combinedHealthCard}>
+      {subscription ? (
+        <View style={styles.combinedSection}>
+          <SubscriptionCard subscription={subscription} />
+        </View>
+      ) : null}
+      {supportHealth ? (
+        <View style={styles.combinedSection}>
+          <SupportHealthCard supportHealth={supportHealth} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+export function RecentActivityList({ items, onItemPress, onViewAll }: RecentActivityListProps) {
+  return (
+    <View>
+      <View style={styles.recentHeader}>
+        <Text style={styles.recentHeaderTitle}>Recent Activity</Text>
+        {onViewAll && items.length ? (
+          <Pressable style={styles.viewAllPill} onPress={onViewAll}>
+            <Text style={styles.viewAllText}>View All</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={styles.recentCard}>
+        {items.length ? (
+          items.map((item, index) => (
+            <Pressable
+              key={item.id}
+              style={[styles.activityRow, index < items.length - 1 ? styles.activityRowBorder : null]}
+              onPress={() => onItemPress(item)}>
+              <View style={[styles.activityIconWrap, { backgroundColor: activityIconTone(item.type) }]}>
+                <MaterialIcons color={activityIconColor(item.type)} name={activityIconForType(item.type)} size={18} />
+              </View>
+
+              <View style={styles.activityCopy}>
+                <Text numberOfLines={1} style={styles.activityTitle}>
+                  {item.title}
+                </Text>
+                <Text numberOfLines={1} style={styles.activitySubtitle}>
+                  {item.subtitle || 'Recent update'}
+                </Text>
+              </View>
+
+              <View style={styles.activityTrail}>
+                <View style={styles.activityTag}>
+                  <Text numberOfLines={1} style={[styles.activityTagText, { color: activityIconColor(item.type) }]}>
+                    {activityTagText(item)}
+                  </Text>
+                </View>
+                <MaterialIcons color={palette.outline} name="chevron-right" size={18} />
+              </View>
+            </Pressable>
+          ))
+        ) : (
+          <EmptyAnalyticsState
+            body="Your latest tasks, journals, contracts, and support updates will appear here as activity picks up."
+            icon="history"
+            label="No recent activity yet"
+            size="compact"
+          />
+        )}
+      </View>
+    </View>
+  );
+}
+
+export function EmptyAnalyticsState({
+  body,
+  icon = 'insert-chart-outlined',
+  label,
+  size = 'default',
+}: EmptyAnalyticsStateProps) {
+  return (
+    <View style={[styles.emptyAnalytics, emptySizeStyles[size]]}>
+      <View style={styles.emptyIconWrap}>
+        <MaterialIcons color={palette.primary} name={icon} size={20} />
+      </View>
+      <Text style={styles.emptyAnalyticsTitle}>{label}</Text>
+      {body ? <Text style={styles.emptyAnalyticsText}>{body}</Text> : null}
+    </View>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <Text numberOfLines={1} style={styles.legendLabel}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function BreakdownRow({ color, label, value }: { color: string; label: string; value: string }) {
+  return (
+    <View style={styles.breakdownRow}>
+      <View style={styles.breakdownLabelRow}>
+        <View style={[styles.legendDot, { backgroundColor: color }]} />
+        <Text numberOfLines={1} style={styles.breakdownLabel}>
+          {label}
+        </Text>
+      </View>
+      <Text style={styles.breakdownValue}>{value}</Text>
+    </View>
+  );
+}
+
+function shortLabel(label: string) {
+  if (label.toLowerCase().includes('journal')) {
+    return 'Journals';
+  }
+  if (label.toLowerCase().includes('contract')) {
+    return 'Contracts';
+  }
+  if (label.toLowerCase().includes('cover')) {
+    return 'Covers';
+  }
+  if (label.toLowerCase().includes('task')) {
+    return 'Tasks';
+  }
+  return label;
+}
+
+function compactBucketLabel(label: string) {
+  if (label.length <= 10) {
+    return label;
+  }
+  return label.replace(' days', 'd').replace(' day', 'd');
+}
+
+function activityTagText(item: DashboardRecentActivity) {
+  if (item.status) {
+    return item.status;
+  }
+  return item.type.replace('_', ' ');
+}
+
+function activityIconForType(type: DashboardRecentActivity['type']): keyof typeof MaterialIcons.glyphMap {
+  switch (type) {
+    case 'BILLING':
+      return 'receipt-long';
+    case 'CONTRACT':
+      return 'description';
+    case 'COVER':
+      return 'shield';
+    case 'JOURNAL':
+      return 'menu-book';
+    case 'SUPPORT_TICKET':
+      return 'contact-support';
+    case 'TASK':
+      return 'assignment';
+    default:
+      return 'insights';
+  }
+}
+
+function activityIconTone(type: DashboardRecentActivity['type']) {
+  switch (type) {
+    case 'CONTRACT':
+      return 'rgba(100,116,139,0.12)';
+    case 'JOURNAL':
+      return 'rgba(147,51,234,0.12)';
+    case 'SUPPORT_TICKET':
+      return 'rgba(249,115,22,0.12)';
+    case 'COVER':
+      return 'rgba(37,99,235,0.12)';
+    default:
+      return 'rgba(0,92,171,0.1)';
+  }
+}
+
+function activityIconColor(type: DashboardRecentActivity['type']) {
+  switch (type) {
+    case 'CONTRACT':
+      return '#64748B';
+    case 'JOURNAL':
+      return '#7C3AED';
+    case 'SUPPORT_TICKET':
+      return '#EA580C';
+    case 'COVER':
+      return '#2563EB';
+    default:
+      return palette.primary;
+  }
+}
+
+const emptySizeStyles = StyleSheet.create({
+  compact: {
+    minHeight: 124,
+  },
+  default: {
+    minHeight: 152,
+  },
+  tall: {
+    minHeight: 188,
+  },
+});
+
+const styles = StyleSheet.create({
+  actionCopy: { flex: 1, gap: 2 },
+  actionIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(186,26,26,0.1)',
+    borderRadius: radius.pill,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  actionList: { gap: spacing.sm },
+  actionRow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderColor: 'rgba(255,211,211,0.65)',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.sm,
+  },
+  actionSubtitle: { color: palette.onSurfaceVariant, fontSize: typography.bodySmall },
+  actionTitle: { color: palette.onSurface, fontSize: typography.bodySmall, fontWeight: '700' },
+  activityCopy: { flex: 1, gap: 2 },
+  activityIconWrap: {
+    alignItems: 'center',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  activityRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  activityRowBorder: { borderBottomColor: '#EEF2F7', borderBottomWidth: 1 },
+  activitySubtitle: { color: palette.onSurfaceVariant, fontSize: 13 },
+  activityTag: {
+    backgroundColor: 'rgba(241,245,249,0.9)',
+    borderRadius: radius.pill,
+    maxWidth: 112,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  activityTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  activityTitle: { color: palette.onSurface, fontSize: typography.body, fontWeight: '600' },
+  activityTrail: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+  analyticsCard: {
+    backgroundColor: palette.surfaceContainerLowest,
+    borderRadius: 22,
+    gap: spacing.sm,
+    minHeight: 214,
+    padding: spacing.sm + 2,
+    shadowColor: '#001B3A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+  },
+  analyticsHighlight: { color: palette.onSurface, fontSize: 13, fontWeight: '700' },
+  breakdownLabel: { color: palette.onSurfaceVariant, flexShrink: 1, fontSize: 13 },
+  breakdownLabelRow: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: spacing.xs },
+  breakdownList: { flex: 1, gap: spacing.sm, justifyContent: 'center' },
+  breakdownRow: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
+  breakdownValue: { color: palette.onSurface, fontSize: typography.bodySmall, fontWeight: '700' },
+  cardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  cardMenuRow: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
+  categoryLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
+  combinedHealthCard: {
+    backgroundColor: palette.surfaceContainerLowest,
+    borderRadius: 22,
+    gap: spacing.sm,
+    padding: spacing.sm + 2,
+    shadowColor: '#001B3A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+  },
+  combinedSection: {
+    borderColor: 'rgba(0,92,171,0.08)',
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: spacing.sm,
+  },
+  completionRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  emptyAnalytics: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(246,249,255,0.96)',
+    borderColor: 'rgba(0,92,171,0.08)',
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  emptyAnalyticsText: {
+    color: palette.onSurfaceVariant,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  emptyAnalyticsTitle: {
+    color: palette.onSurface,
+    fontSize: typography.bodySmall,
+    fontWeight: '700',
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  emptyIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,92,171,0.08)',
+    borderRadius: 16,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  featureBadgeRow: {
+    alignItems: 'flex-start',
+    marginTop: spacing.sm,
+  },
+  featureBodyCopy: { flex: 1, gap: 2 },
+  featureBodyRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  featureCard: {
+    gap: spacing.xs,
+  },
+  featureIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,92,171,0.08)',
+    borderRadius: 22,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  featureMetaHint: { color: palette.onSurfaceVariant, fontSize: 11 },
+  featureMetaLabel: { color: palette.onSurfaceVariant, fontSize: 13 },
+  featureMetaValue: { color: palette.onSurface, fontSize: 17, fontWeight: '700' },
+  featureTitle: { color: palette.onSurface, fontSize: 16, fontWeight: '700' },
+  legendDot: { borderRadius: 99, height: 10, width: 10 },
+  legendItem: { alignItems: 'center', flexDirection: 'row', gap: spacing.xs, maxWidth: '48%' },
+  legendLabel: { color: palette.onSurfaceVariant, flexShrink: 1, fontSize: 11, fontWeight: '600' },
+  performanceActions: { alignItems: 'center', flexDirection: 'row', flexShrink: 0, justifyContent: 'flex-end' },
+  performanceFooter: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  performanceHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
+  performanceHeading: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: spacing.sm },
+  performanceHeadingCopy: { flex: 1, minWidth: 0 },
+  performanceIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(37,99,235,0.08)',
+    borderRadius: 16,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  performancePill: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(248,250,252,1)',
+    borderColor: '#D8E1EE',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 2,
+    maxWidth: 128,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  performancePillText: { color: palette.onSurface, flexShrink: 1, fontSize: 13, fontWeight: '600' },
+  performanceTotal: { color: palette.primary, fontSize: typography.body, fontWeight: '700' },
+  planPill: {
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    borderRadius: radius.pill,
+    maxWidth: 110,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  planPillText: { color: '#2563EB', fontSize: 11, fontWeight: '700' },
+  progressFill: {
+    backgroundColor: palette.primaryContainer,
+    borderRadius: radius.pill,
+    height: '100%',
+  },
+  progressRow: { gap: spacing.xs, marginTop: spacing.sm },
+  progressText: { color: palette.primary, fontSize: 13, fontWeight: '600' },
+  progressTrack: {
+    backgroundColor: '#DCE3EC',
+    borderRadius: radius.pill,
+    height: 6,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  recentCard: {
+    backgroundColor: palette.surfaceContainerLowest,
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#001B3A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+  },
+  recentHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  recentHeaderTitle: { color: palette.white, fontSize: 18, fontWeight: '700' },
+  sectionCard: {
+    backgroundColor: palette.surfaceContainerLowest,
+    borderRadius: 22,
+    gap: spacing.sm,
+    padding: spacing.sm + 2,
+    shadowColor: '#001B3A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+  },
+  sectionCardBody: { color: palette.onSurfaceVariant, fontSize: 13 },
+  sectionCardHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sectionCardTitle: { color: palette.onSurface, fontSize: 16, fontWeight: '700' },
+  statusBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(22,163,74,0.1)',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  statusBadgeText: { color: '#16A34A', fontSize: 13, fontWeight: '700', textTransform: 'capitalize' },
+  successPill: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(22,163,74,0.1)',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: spacing.xs,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  successPillText: { color: '#16A34A', fontSize: 13, fontWeight: '700' },
+  summaryCard: {
+    backgroundColor: palette.surfaceContainerLowest,
+    borderRadius: 20,
+    minHeight: 142,
+    padding: spacing.sm + 2,
+    shadowColor: '#001B3A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+  },
+  summaryIconWrap: {
+    alignItems: 'center',
+    borderRadius: 14,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  summaryMetricRow: { marginTop: spacing.xs },
+  summarySubtitle: { color: palette.onSurfaceVariant, fontSize: 13, marginTop: 2 },
+  summaryTitle: { color: palette.onSurface, fontSize: 15, fontWeight: '600', marginTop: spacing.xs },
+  summaryTrendRow: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: spacing.sm,
+    maxWidth: '100%',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  summaryTrendText: { flexShrink: 1, fontSize: 10, fontWeight: '700' },
+  summaryValue: { color: palette.onSurface, fontSize: 24, fontWeight: '700' },
+  supportCopy: { flex: 1, gap: 2 },
+  supportHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  supportIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(22,163,74,0.12)',
+    borderRadius: 22,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  supportPill: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(22,163,74,0.1)',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: spacing.sm,
+    maxWidth: '100%',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  supportPillText: { color: '#15803D', flexShrink: 1, fontSize: 13, fontWeight: '700' },
+  supportStatus: { color: '#16A34A', fontSize: 16, fontWeight: '700' },
+  supportTime: { color: palette.onSurface, fontSize: 16, fontWeight: '700' },
+  tileSubtitle: { color: palette.onSurfaceVariant, fontSize: 13 },
+  tileTitle: { color: palette.onSurface, fontSize: 16, fontWeight: '700' },
+  viewAllPill: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  viewAllText: { color: palette.white, fontSize: typography.bodySmall, fontWeight: '700' },
+  warningCard: {
+    backgroundColor: 'rgba(255,248,248,0.98)',
+    borderColor: 'rgba(186,26,26,0.15)',
+  },
+  warningPill: {
+    backgroundColor: 'rgba(186,26,26,0.12)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  warningPillText: { color: palette.error, fontSize: typography.label, fontWeight: '800' },
+});

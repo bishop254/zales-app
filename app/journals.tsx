@@ -380,17 +380,19 @@ export default function JournalsScreen() {
       <FloatingPageShell
         avatarLetter={avatarLetter}
         bottomSlot={<FloatingBottomNav activeKey={moreMenuOpen ? 'more' : 'journals'} onPress={handleBottomNavPress} />}
+        notificationCount={todayEntry ? 0 : 1}
         onBackPress={() => router.replace('/dashboard')}
-        onNotificationPress={() =>
-          setInfoModal({
-            eyebrow: 'Journal',
-            message: todayEntry
-              ? 'Today already has a journal entry. You can keep refining it from this workspace.'
-              : 'You do not have a journal entry for today yet. Use New entry to capture it.',
-            title: 'Daily journal',
-            visible: true,
-          })
-        }
+        onNotificationPress={() => {
+          if (todayEntry) {
+            router.push({
+              params: { id: todayEntry.id, mode: 'edit' },
+              pathname: '/journal-form',
+            });
+            return;
+          }
+
+          router.push('/journal-form');
+        }}
         onProfilePress={() =>
           setInfoModal({
             eyebrow: 'Account',
@@ -1098,12 +1100,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   summaryGrid: {
-    columnGap: spacing.md,
+    columnGap: spacing.sm,
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: -4,
     paddingHorizontal: spacing.marginMobile,
-    rowGap: spacing.md,
+    rowGap: spacing.sm,
   },
   viewModalFrame: {
     maxHeight: '75%',

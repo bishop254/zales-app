@@ -1462,12 +1462,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   summaryGrid: {
-    columnGap: spacing.md,
+    columnGap: spacing.sm,
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: -4,
     paddingHorizontal: spacing.marginMobile,
-    rowGap: spacing.md,
+    rowGap: spacing.sm,
   },
   taskCopy: {
     flex: 1,
