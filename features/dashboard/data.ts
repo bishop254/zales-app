@@ -84,9 +84,9 @@ export const recentActivity: ActivityItem[] = [
 
 export const bottomNavItems: BottomNavItem[] = [
   { icon: 'home-filled', key: 'home', label: 'Home' },
-  { icon: 'menu-book', key: 'journals', label: 'Journal' },
   { icon: 'assignment', key: 'tasks', label: 'Tasks' },
-  { icon: 'description', key: 'contracts', label: 'Contracts' },
   { icon: 'shield', key: 'covers', label: 'Covers' },
+  { icon: 'description', key: 'contracts', label: 'Contracts' },
+  { icon: 'menu-book', key: 'journals', label: 'Journal' },
   { icon: 'more-horiz', key: 'more', label: 'More' },
 ];

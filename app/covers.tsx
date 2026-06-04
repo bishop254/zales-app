@@ -117,25 +117,23 @@ function isMonthlyCover(cover: CoverRecord) {
   return cover.cycle === 'MONTHLY';
 }
 
-function getCoverTrackingDate(cover: CoverRecord) {
-  return isMonthlyCover(cover) ? cover.nextDueDate ?? cover.expiryDate : cover.expiryDate;
-}
-
 function sortBySoonestDate<T>(items: T[], getDate: (item: T) => string | null) {
   return [...items].sort((left, right) => daysUntil(getDate(left)) - daysUntil(getDate(right)));
 }
 
 function getCoverStatus(cover: CoverRecord): CoverStatus {
-  if (daysUntil(cover.expiryDate) < 0) {
+  const daysToExpiry = daysUntil(cover.expiryDate);
+
+  if (daysToExpiry < 0) {
     return 'LAPSED';
   }
 
-  return daysUntil(getCoverTrackingDate(cover)) <= 7 ? 'DUE' : 'ACTIVE';
+  return daysToExpiry <= 7 ? 'DUE' : 'ACTIVE';
 }
 
 function mapCoverToListItem(cover: CoverRecord): CoverListItem {
   return {
-    dueDate: formatLongDate(getCoverTrackingDate(cover)),
+    dueDate: formatLongDate(cover.expiryDate),
     id: cover.id,
     provider: cover.insuranceProvider,
     status: getCoverStatus(cover),
@@ -577,11 +575,11 @@ export default function CoversScreen() {
     try {
       await markCyclePaid(session.accessToken, coverId);
       setNotificationConfirm({ coverId: null, kind: null, visible: false });
-      showToast('Cycle marked as paid.');
+      showToast('Payment cycle marked as paid.');
       await loadCovers({ silent: true });
     } catch (error) {
       if (!(error instanceof UnauthorizedError)) {
-        showToast(error instanceof Error ? error.message : 'Unable to mark cycle as paid.', 'error');
+        showToast(error instanceof Error ? error.message : 'Unable to mark payment cycle as paid.', 'error');
       }
     } finally {
       setMarkingPaidId(null);
@@ -640,6 +638,18 @@ export default function CoversScreen() {
     }
 
     await handleMarkExpiryComplete(notificationConfirm.coverId);
+  }
+
+  function handleEditNotificationCover() {
+    if (!notificationConfirmCover) {
+      return;
+    }
+
+    closeNotificationConfirm();
+    router.push({
+      pathname: '/cover-form',
+      params: { id: notificationConfirmCover.id, mode: 'edit' },
+    });
   }
 
   return (
@@ -872,7 +882,7 @@ export default function CoversScreen() {
             <DetailRow label="Provider" value={selectedCoverDetail.insuranceProvider} />
             <DetailRow label="Product" value={selectedCoverDetail.insuranceProduct} />
             <DetailRow label="Premium" value={`${selectedCoverDetail.currency} ${Number(selectedCoverDetail.insurancePremium).toLocaleString()}`} />
-            <DetailRow label="Cycle" value={selectedCoverDetail.cycle} />
+            <DetailRow label="Payment cycle" value={selectedCoverDetail.cycle} />
             <DetailRow label="Expiry date" value={formatLongDate(selectedCoverDetail.expiryDate)} />
             <DetailRow label="Next due date" value={formatLongDate(selectedCoverDetail.nextDueDate)} />
             <DetailRow label="Vehicle reg" value={selectedCoverDetail.vehicleReg ?? 'Not provided'} />
@@ -975,7 +985,7 @@ export default function CoversScreen() {
         <Text style={styles.modalIntro}>
           {totalNotificationCount
             ? `${totalNotificationCount} cover notification${totalNotificationCount === 1 ? '' : 's'} need attention.`
-            : 'No cycle-due or expiry alerts right now.'}
+            : 'No payment-cycle or expiry alerts right now.'}
         </Text>
 
         <View style={styles.modalSection}>
@@ -1073,22 +1083,22 @@ export default function CoversScreen() {
                 />
               ) : (
                 <Text style={styles.modalButtonText}>
-                  {notificationConfirm.kind === 'cycle' ? 'Mark as paid' : 'Mark as complete'}
+                  {notificationConfirm.kind === 'cycle' ? 'Mark as paid' : 'Confirm renewal'}
                 </Text>
               )}
             </Pressable>
           </View>
         }
         frameStyle={styles.deleteModalFrame}
-        title={notificationConfirm.kind === 'cycle' ? 'Confirm cycle payment' : 'Confirm expiry completion'}
+        title={notificationConfirm.kind === 'cycle' ? 'Confirm payment cycle' : 'Confirm cover renewal'}
         visible={notificationConfirm.visible}
         onClose={closeNotificationConfirm}>
         {notificationConfirmCover ? (
           <View style={styles.detailList}>
             <Text style={styles.modalIntro}>
               {notificationConfirm.kind === 'cycle'
-                ? 'Confirm that this monthly cycle has been paid before we update the cover record.'
-                : 'Confirm that this cover expiry has been completed before we update the notification status.'}
+                ? 'Confirm that this monthly payment cycle has been paid before we update the cover record.'
+                : 'Confirm this cover renewal, or edit the expiry date first if the renewed date needs to be updated before continuing.'}
             </Text>
             <View style={styles.detailHeaderCard}>
               <View
@@ -1120,15 +1130,24 @@ export default function CoversScreen() {
                 <Text style={styles.coverStatusText}>{getCoverStatus(notificationConfirmCover)}</Text>
               </View>
             </View>
-            <DetailRow
-              label={notificationConfirm.kind === 'cycle' ? 'Next due date' : 'Expiry date'}
-              value={formatLongDate(
-                notificationConfirm.kind === 'cycle'
-                  ? notificationConfirmCover.nextDueDate ?? notificationConfirmCover.expiryDate
-                  : notificationConfirmCover.expiryDate
-              )}
-            />
-            <DetailRow label="Cycle" value={notificationConfirmCover.cycle} />
+            {notificationConfirm.kind === 'cycle' ? (
+              <DetailRow
+                label="Next due date"
+                value={formatLongDate(notificationConfirmCover.nextDueDate ?? notificationConfirmCover.expiryDate)}
+              />
+            ) : (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Expiry date</Text>
+                <View style={styles.detailActionRow}>
+                  <Text style={styles.detailValue}>{formatLongDate(notificationConfirmCover.expiryDate)}</Text>
+                  <Pressable style={styles.inlineEditButton} onPress={handleEditNotificationCover}>
+                    <MaterialIcons color={palette.primary} name="edit" size={16} />
+                    <Text style={styles.inlineEditButtonText}>Edit</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+            <DetailRow label="Payment cycle" value={notificationConfirmCover.cycle} />
             <DetailRow
               label="Premium"
               value={`${notificationConfirmCover.currency} ${Number(notificationConfirmCover.insurancePremium).toLocaleString()}`}
@@ -1424,6 +1443,12 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '700',
   },
+  detailActionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
   detailLabel: {
     color: palette.onSurfaceVariant,
     fontSize: typography.label,
@@ -1439,9 +1464,24 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     color: palette.onSurface,
+    flex: 1,
     fontSize: typography.bodySmall,
     fontWeight: '600',
     lineHeight: 20,
+  },
+  inlineEditButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 92, 171, 0.08)',
+    borderRadius: radius.pill,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+  },
+  inlineEditButtonText: {
+    color: palette.primary,
+    fontSize: typography.label,
+    fontWeight: '700',
   },
   notificationsModalFrame: {
     maxHeight: '70%',

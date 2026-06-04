@@ -34,15 +34,49 @@ import {
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { ReferralCodePill } from '@/components/dashboard/referral-code-pill';
 import { imagery, palette, radius, spacing, typography } from '@/constants/app-theme';
-import type { DashboardRecentActivity } from '@/features/analytics/analytics-types';
+import type { DashboardAnalyticsResponse, DashboardRecentActivity } from '@/features/analytics/analytics-types';
 import { useDashboardAnalytics } from '@/features/analytics/use-dashboard-analytics';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
 import { useToast } from '@/providers/toast-provider';
 
 type AdminAudienceMode = 'all_users' | 'specific_user';
+type NotificationModuleKey = 'all' | 'tasks' | 'covers' | 'contracts' | 'support' | 'billing';
+type DashboardNotificationItem = NonNullable<DashboardAnalyticsResponse['actionNeeded']>['items'][number];
+type NotificationTab = {
+  count: number;
+  key: NotificationModuleKey;
+  label: string;
+};
 
 const SUMMARY_CARD_KEYS = ['tasks', 'contracts', 'covers', 'journals'];
+
+function moduleKeyForAction(route?: string): NotificationModuleKey {
+  const normalizedRoute = route?.toLowerCase() ?? '';
+
+  if (normalizedRoute.includes('task')) {
+    return 'tasks';
+  }
+
+  if (normalizedRoute.includes('cover')) {
+    return 'covers';
+  }
+
+  if (normalizedRoute.includes('contract')) {
+    return 'contracts';
+  }
+
+  if (normalizedRoute.includes('support')) {
+    return 'support';
+  }
+
+  if (normalizedRoute.includes('billing')) {
+    return 'billing';
+  }
+
+  return 'all';
+}
+
 export default function DashboardScreen() {
   const { logout, session } = useAuth();
   const { showToast } = useToast();
@@ -51,6 +85,8 @@ export default function DashboardScreen() {
   const [activeTab, setActiveTab] = useState('home');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [adminPickerOpen, setAdminPickerOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationTab, setNotificationTab] = useState<NotificationModuleKey>('all');
   const [summaryPage, setSummaryPage] = useState(0);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const isAdmin = session?.roles?.includes('ADMIN') ?? false;
@@ -127,6 +163,39 @@ export default function DashboardScreen() {
 
   const summaryPages = Math.max(1, Math.ceil(summaryCards.length / 2));
   const recentActivityPreview = useMemo(() => (analytics?.recentActivity ?? []).slice(0, 4), [analytics?.recentActivity]);
+  const notificationItems = useMemo(() => analytics?.actionNeeded?.items ?? [], [analytics?.actionNeeded?.items]);
+  const notificationTabs = useMemo<NotificationTab[]>(() => {
+    const groupedCounts: Record<Exclude<NotificationModuleKey, 'all'>, number> = {
+      billing: 0,
+      contracts: 0,
+      covers: 0,
+      support: 0,
+      tasks: 0,
+    };
+
+    for (const item of notificationItems) {
+      const moduleKey = moduleKeyForAction(item.route);
+      if (moduleKey !== 'all') {
+        groupedCounts[moduleKey] += 1;
+      }
+    }
+
+    return [
+      { count: notificationItems.length, key: 'all', label: 'All' },
+      { count: groupedCounts.tasks, key: 'tasks', label: 'Tasks' },
+      { count: groupedCounts.covers, key: 'covers', label: 'Covers' },
+      { count: groupedCounts.contracts, key: 'contracts', label: 'Contracts' },
+      { count: groupedCounts.support, key: 'support', label: 'Support' },
+      { count: groupedCounts.billing, key: 'billing', label: 'Billing' },
+    ].filter((tab) => tab.key === 'all' || tab.count > 0);
+  }, [notificationItems]);
+  const visibleNotificationItems = useMemo(
+    () =>
+      notificationTab === 'all'
+        ? notificationItems
+        : notificationItems.filter((item) => moduleKeyForAction(item.route) === notificationTab),
+    [notificationItems, notificationTab],
+  );
 
   const welcomeTitle = useMemo(() => {
     if (!isAdmin) {
@@ -245,7 +314,8 @@ export default function DashboardScreen() {
     const actionCount = analytics?.actionNeeded?.total ?? 0;
 
     if (actionCount > 0) {
-      showToast(`${actionCount} dashboard alerts need your attention.`, 'success');
+      setNotificationTab('all');
+      setNotificationsOpen(true);
       return;
     }
 
@@ -347,6 +417,11 @@ export default function DashboardScreen() {
     }
 
     routeToModule(route);
+  }
+
+  function handleNotificationItemPress(item: DashboardNotificationItem) {
+    setNotificationsOpen(false);
+    handleActionRoutePress(item.route);
   }
 
   function handleProfilePress() {
@@ -618,6 +693,77 @@ export default function DashboardScreen() {
         ) : null}
 
         <AppModal
+          eyebrow="Notifications"
+          onClose={() => setNotificationsOpen(false)}
+          title="Dashboard alerts"
+          visible={notificationsOpen}>
+          <View style={styles.notificationModalBody}>
+            <Text style={styles.modalIntro}>
+              {notificationItems.length
+                ? `${notificationItems.length} alert${notificationItems.length === 1 ? '' : 's'} across your workspace need attention.`
+                : 'You are all caught up across tasks, covers, contracts, support, and billing.'}
+            </Text>
+
+            <ScrollView
+              contentContainerStyle={styles.notificationTabRow}
+              horizontal
+              showsHorizontalScrollIndicator={false}>
+              {notificationTabs.map((tab) => {
+                const active = tab.key === notificationTab;
+
+                return (
+                  <Pressable
+                    key={tab.key}
+                    style={[styles.notificationTab, active ? styles.notificationTabActive : null]}
+                    onPress={() => setNotificationTab(tab.key)}>
+                    <Text style={[styles.notificationTabText, active ? styles.notificationTabTextActive : null]}>
+                      {tab.label}
+                    </Text>
+                    <View style={[styles.notificationTabCount, active ? styles.notificationTabCountActive : null]}>
+                      <Text
+                        style={[
+                          styles.notificationTabCountText,
+                          active ? styles.notificationTabCountTextActive : null,
+                        ]}>
+                        {tab.count}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {visibleNotificationItems.length ? (
+              <View style={styles.notificationListCard}>
+                {visibleNotificationItems.map((item, index) => (
+                  <Pressable
+                    key={`${item.type}-${item.title}-${index}`}
+                    style={[
+                      styles.notificationAlertRow,
+                      index < visibleNotificationItems.length - 1 ? styles.notificationAlertRowBorder : null,
+                    ]}
+                    onPress={() => handleNotificationItemPress(item)}>
+                    <View style={styles.notificationAlertIconWrap}>
+                      <MaterialIcons color={palette.primary} name="notifications-active" size={18} />
+                    </View>
+                    <View style={styles.notificationAlertCopy}>
+                      <Text style={styles.notificationAlertTitle}>{item.title}</Text>
+                      <Text style={styles.notificationAlertSubtitle}>{item.subtitle ?? 'Needs attention'}</Text>
+                    </View>
+                    <MaterialIcons color={palette.onSurfaceVariant} name="chevron-right" size={20} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.notificationEmptyCard}>
+                <Text style={styles.notificationEmptyTitle}>No alerts in this tab</Text>
+                <Text style={styles.notificationEmptyBody}>Switch tabs to review alerts from other modules.</Text>
+              </View>
+            )}
+          </View>
+        </AppModal>
+
+        <AppModal
           eyebrow="Analytics Scope"
           onClose={() => setAdminPickerOpen(false)}
           title="Select a user"
@@ -825,6 +971,114 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     gap: spacing.sm,
+  },
+  notificationAlertCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  notificationAlertIconWrap: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 92, 171, 0.1)',
+    borderRadius: radius.pill,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  notificationAlertRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  notificationAlertRowBorder: {
+    borderBottomColor: '#EEF2F7',
+    borderBottomWidth: 1,
+  },
+  notificationAlertSubtitle: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+  },
+  notificationAlertTitle: {
+    color: palette.onSurface,
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
+  notificationEmptyBody: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+    textAlign: 'center',
+  },
+  notificationEmptyCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.78)',
+    borderColor: 'rgba(0,92,171,0.08)',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    gap: spacing.xs,
+    padding: spacing.md,
+  },
+  notificationEmptyTitle: {
+    color: palette.onSurface,
+    fontSize: typography.body,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  notificationListCard: {
+    backgroundColor: palette.surfaceContainerLowest,
+    borderColor: 'rgba(0,92,171,0.08)',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  notificationModalBody: {
+    gap: spacing.md,
+  },
+  notificationTab: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.76)',
+    borderColor: 'rgba(0,92,171,0.1)',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  notificationTabActive: {
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
+  },
+  notificationTabCount: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,92,171,0.1)',
+    borderRadius: radius.pill,
+    minWidth: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  notificationTabCountActive: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  notificationTabCountText: {
+    color: palette.primary,
+    fontSize: typography.label,
+    fontWeight: '700',
+  },
+  notificationTabCountTextActive: {
+    color: palette.white,
+  },
+  notificationTabRow: {
+    gap: spacing.sm,
+    paddingRight: spacing.sm,
+  },
+  notificationTabText: {
+    color: palette.onSurface,
+    fontSize: typography.label,
+    fontWeight: '700',
+  },
+  notificationTabTextActive: {
+    color: palette.white,
   },
   modalEmpty: {
     alignItems: 'center',
