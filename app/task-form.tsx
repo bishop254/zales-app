@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AppModal } from '@/components/app/app-modal';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
-import { AuthSearchSelectField, AuthSelectField, AuthTextField } from '@/components/auth/auth-primitives';
+import { AuthPressableField, AuthSearchSelectField, AuthSelectField, AuthTextField } from '@/components/auth/auth-primitives';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
@@ -676,14 +676,13 @@ export default function TaskFormScreen() {
                 <View style={styles.formStack}>
                   {form.taskType === 'ONE_OFF' ? (
                     <>
-                      <AuthTextField
+                      <AuthPressableField
                         error={getFieldError('oneOffDate')}
                         icon="event"
                         label="Scheduled date"
                         placeholder="16 May 2026"
-                        showSoftInputOnFocus={false}
                         value={form.oneOffDate ? formatReadableDate(form.oneOffDate) : ''}
-                        onFocus={() => {
+                        onPress={() => {
                           markTouched('oneOffDate');
                           openDatePicker('oneOffDate');
                         }}
@@ -713,26 +712,24 @@ export default function TaskFormScreen() {
                           markTouched('recurrence');
                         }}
                       />
-                      <AuthTextField
+                      <AuthPressableField
                         error={getFieldError('seriesStartDate')}
                         icon="event-available"
                         label="Series start date"
                         placeholder="16 May 2026"
-                        showSoftInputOnFocus={false}
                         value={form.seriesStartDate ? formatReadableDate(form.seriesStartDate) : ''}
-                        onFocus={() => {
+                        onPress={() => {
                           markTouched('seriesStartDate');
                           openDatePicker('seriesStartDate');
                         }}
                       />
-                      <AuthTextField
+                      <AuthPressableField
                         error={getFieldError('seriesEndDate')}
                         icon="event-busy"
                         label="Series end date"
                         placeholder="30 June 2026"
-                        showSoftInputOnFocus={false}
                         value={form.seriesEndDate ? formatReadableDate(form.seriesEndDate) : ''}
-                        onFocus={() => {
+                        onPress={() => {
                           markTouched('seriesEndDate');
                           openDatePicker('seriesEndDate');
                         }}

@@ -25,7 +25,7 @@ import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AppModal } from '@/components/app/app-modal';
 import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
-import { AuthTextField } from '@/components/auth/auth-primitives';
+import { AuthPressableField } from '@/components/auth/auth-primitives';
 import { apiConfig } from '@/constants/api';
 import { SummaryCard, type SummaryCardTone } from '@/components/dashboard/summary-card';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
@@ -1138,14 +1138,13 @@ export default function ContractsScreen() {
             <DetailRow label="Expiry date" value={formatLongDate(notificationConfirmContract.contractExpiryDate)} />
             <DetailRow label="Start date" value={formatLongDate(notificationConfirmContract.contractStartDate)} />
             <DetailRow label="Description" value={notificationConfirmContract.description ?? 'Not provided'} />
-            <AuthTextField
+            <AuthPressableField
               error={notificationConfirmExpiryError ?? ''}
               icon="event-busy"
               label="New Expiry Date"
               placeholder="Select expiry date"
-              showSoftInputOnFocus={false}
               value={notificationConfirm.expiryDate ? formatReadableDate(notificationConfirm.expiryDate) : ''}
-              onFocus={openCompletionDatePicker}
+              onPress={openCompletionDatePicker}
             />
           </View>
         ) : (

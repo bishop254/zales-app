@@ -53,6 +53,20 @@ type AuthTextFieldProps = TextInputProps & {
   secureToggle?: boolean;
 };
 
+type AuthPressableFieldProps = {
+  containerStyle?: StyleProp<ViewStyle>;
+  label: string;
+  optionalLabel?: string;
+  error?: string;
+  icon?: keyof typeof MaterialIcons.glyphMap;
+  actionLabel?: string;
+  onActionPress?: () => void;
+  placeholder: string;
+  value: string;
+  onPress: () => void;
+  disabled?: boolean;
+};
+
 type AuthSelectFieldProps = {
   containerStyle?: StyleProp<ViewStyle>;
   error?: string;
@@ -247,6 +261,49 @@ export function AuthTextField({
           </Pressable>
         ) : null}
       </View>
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+    </View>
+  );
+}
+
+export function AuthPressableField({
+  actionLabel,
+  containerStyle,
+  disabled = false,
+  error,
+  icon,
+  label,
+  onActionPress,
+  onPress,
+  optionalLabel,
+  placeholder,
+  value,
+}: AuthPressableFieldProps) {
+  return (
+    <View style={[styles.fieldBlock, containerStyle]}>
+      <View style={styles.fieldLabelRow}>
+        <Text style={[styles.fieldLabel, error ? styles.fieldLabelError : null]}>{label}</Text>
+        {optionalLabel ? <Text style={styles.optionalLabel}>{optionalLabel}</Text> : null}
+        {actionLabel && onActionPress ? (
+          <Pressable onPress={onActionPress}>
+            <Text style={styles.fieldAction}>{actionLabel}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        disabled={disabled}
+        style={[
+          styles.inputShell,
+          error ? styles.inputShellError : null,
+          disabled ? styles.inputShellDisabled : null,
+        ]}
+        onPress={onPress}>
+        {icon ? <MaterialIcons color={palette.outline} name={icon} size={20} /> : null}
+        <Text numberOfLines={1} style={[styles.selectValue, !value ? styles.selectPlaceholder : null]}>
+          {value || placeholder}
+        </Text>
+      </Pressable>
       {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
@@ -665,6 +722,9 @@ const styles = StyleSheet.create({
   },
   inputShellError: {
     borderColor: palette.error,
+  },
+  inputShellDisabled: {
+    opacity: 0.7,
   },
   optionsPanel: {
     backgroundColor: palette.surfaceContainerLowest,

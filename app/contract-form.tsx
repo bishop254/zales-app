@@ -10,7 +10,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AppModal } from '@/components/app/app-modal';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
-import { AuthTextField } from '@/components/auth/auth-primitives';
+import { AuthPressableField, AuthTextField } from '@/components/auth/auth-primitives';
 import { apiConfig } from '@/constants/api';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
@@ -482,23 +482,21 @@ export default function ContractFormScreen() {
               <View style={styles.sectionCard}>
                 <Text style={styles.sectionTitle}>Timeline</Text>
                 <View style={styles.formStack}>
-                  <AuthTextField
+                  <AuthPressableField
                     error={getFieldError('contractStartDate')}
                     icon="event-available"
                     label="Contract Start Date"
                     placeholder="Select start date"
-                    showSoftInputOnFocus={false}
                     value={form.contractStartDate ? formatReadableDate(form.contractStartDate) : ''}
-                    onFocus={() => openDatePicker('contractStartDate')}
+                    onPress={() => openDatePicker('contractStartDate')}
                   />
-                  <AuthTextField
+                  <AuthPressableField
                     error={getFieldError('contractExpiryDate')}
                     icon="event-busy"
                     label="Contract Expiry Date"
                     placeholder="Select expiry date"
-                    showSoftInputOnFocus={false}
                     value={form.contractExpiryDate ? formatReadableDate(form.contractExpiryDate) : ''}
-                    onFocus={() => openDatePicker('contractExpiryDate')}
+                    onPress={() => openDatePicker('contractExpiryDate')}
                   />
                 </View>
               </View>

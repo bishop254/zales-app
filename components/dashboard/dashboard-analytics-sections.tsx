@@ -2,15 +2,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
-import { AreaLineChart } from '@/components/charts/area-line-chart';
-import { BarChart } from '@/components/charts/bar-chart';
-import { DonutChart } from '@/components/charts/donut-chart';
-import { GroupedBarChart } from '@/components/charts/grouped-bar-chart';
+import { SegmentedDonutChart } from '@/components/charts/donut-chart';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import type {
   DashboardAnalyticsResponse,
   DashboardRecentActivity,
   DashboardSummaryCard,
+  EntityBreakdown,
   TrendDirection,
 } from '@/features/analytics/analytics-types';
 
@@ -26,24 +24,17 @@ type RecentActivityListProps = {
   onViewAll?: () => void;
 };
 
-type PerformanceOutlookCardProps = {
-  analytics: DashboardAnalyticsResponse['performanceOutlook'];
-  chartWidth: number;
-  onRangePress: () => void;
-  rangeLabel: string;
-};
-
 type TaskCompletionCardProps = {
   taskCompletion?: DashboardAnalyticsResponse['performanceOutlook']['taskCompletion'];
 };
 
-type ExpiringSoonChartCardProps = {
-  expiringSoon?: DashboardAnalyticsResponse['performanceOutlook']['expiringSoon'];
-};
-
-type StatusDistributionCardProps = {
-  cards: DashboardSummaryCard[];
-  chartWidth: number;
+type BreakdownAnalyticsCardProps = {
+  breakdown?: EntityBreakdown;
+  emptyBody: string;
+  emptyLabel: string;
+  segmentColors: string[];
+  subtitle: string;
+  title: string;
 };
 
 type ActionNeededCardProps = {
@@ -134,164 +125,57 @@ export function DashboardSummaryAnalyticsCard({ card, onPress, style }: SummaryC
   );
 }
 
-export function PerformanceOutlookCard({
-  analytics,
-  chartWidth,
-  onRangePress,
-  rangeLabel,
-}: PerformanceOutlookCardProps) {
-  const overall = analytics.overallActivity;
-  const totalActivity = analytics.weeklyActivity.reduce(
-    (sum, item) => sum + Math.max(item.completed ?? item.count ?? item.created ?? 0, 0),
-    0,
-  );
-
-  return (
-    <View style={styles.sectionCard}>
-      <View style={styles.performanceHeader}>
-        <View style={styles.performanceHeading}>
-          <View style={styles.performanceIconWrap}>
-            <MaterialIcons color={palette.primary} name="trending-up" size={18} />
-          </View>
-          <View style={styles.performanceHeadingCopy}>
-            <Text numberOfLines={1} style={styles.sectionCardTitle}>
-              Performance Outlook
-            </Text>
-            <Text numberOfLines={1} style={styles.sectionCardBody}>
-              {overall?.label ?? 'Weekly performance overview'}
-            </Text>
-          </View>
-        </View>
-
-        <Pressable style={styles.performancePill} onPress={onRangePress}>
-          <Text numberOfLines={1} style={styles.performancePillText}>
-            {rangeLabel}
-          </Text>
-          <MaterialIcons color={palette.onSurfaceVariant} name="arrow-drop-down" size={18} />
-        </Pressable>
-      </View>
-
-      <AreaLineChart data={analytics.weeklyActivity} height={186} width={chartWidth} />
-
-      <View style={styles.performanceFooter}>
-        <LegendDot color={palette.primaryContainer} label="Completed Items" />
-        <Text style={styles.performanceTotal}>Total: {overall?.value ?? totalActivity}</Text>
-      </View>
-    </View>
-  );
-}
-
 export function TaskCompletionCard({ taskCompletion }: TaskCompletionCardProps) {
-  if (!taskCompletion) {
-    return (
-      <View style={styles.analyticsCard}>
-        <Text style={styles.tileTitle}>Task Completion Rate</Text>
-        <Text style={styles.tileSubtitle}>This Week</Text>
-        <EmptyAnalyticsState
-          body="As you complete more work, your weekly completion score will show up here."
-          icon="donut-large"
-          label="No completion insights yet"
-        />
-      </View>
-    );
-  }
-
-  const completedPercent = taskCompletion.completionRate;
-  const inProgressPercent = taskCompletion.total > 0 ? Math.round(((taskCompletion.inProgress ?? 0) / taskCompletion.total) * 100) : 0;
-  const overduePercent = taskCompletion.total > 0 ? Math.round(((taskCompletion.overdue ?? 0) / taskCompletion.total) * 100) : 0;
-
   return (
-    <View style={styles.analyticsCard}>
-      <Text style={styles.tileTitle}>Task Completion Rate</Text>
-      <Text style={styles.tileSubtitle}>This Week</Text>
-
-      <View style={styles.completionRow}>
-        <DonutChart label="completed" size={120} strokeWidth={13} value={taskCompletion.completionRate} />
-
-        <View style={styles.breakdownList}>
-          <BreakdownRow color={palette.primaryContainer} label="Completed" value={`${completedPercent}%`} />
-          <BreakdownRow color="#93C5FD" label="In Progress" value={`${inProgressPercent}%`} />
-          <BreakdownRow color="#D1D5DB" label="Overdue" value={`${overduePercent}%`} />
-        </View>
-      </View>
-
-      <View style={styles.successPill}>
-        <MaterialIcons color="#16A34A" name="trending-up" size={15} />
-        <Text style={styles.successPillText}>{taskCompletion.completionRate}% completed</Text>
-      </View>
-    </View>
+    <BreakdownAnalyticsCard
+      breakdown={
+        taskCompletion
+          ? {
+              total: taskCompletion.total,
+              items: taskCompletion.breakdown ?? [],
+            }
+          : undefined
+      }
+      emptyBody="As your schedule fills up, completed, overdue, due soon, and scheduled tasks will appear here."
+      emptyLabel="No task completion insights yet"
+      segmentColors={[palette.primaryContainer, '#D97706', '#2563EB', '#CBD5E1']}
+      subtitle="Completed, overdue, due soon, and scheduled"
+      title="Task Completion Rate"
+    />
   );
 }
 
-export function ExpiringSoonChartCard({ expiringSoon }: ExpiringSoonChartCardProps) {
+export function ActiveCoversCard({
+  breakdown,
+}: {
+  breakdown?: DashboardAnalyticsResponse['performanceOutlook']['coverStatusBreakdown'];
+}) {
   return (
-    <View style={styles.analyticsCard}>
-      <View style={styles.expiringSoonHeader}>
-        <View style={styles.expiringSoonHeaderCopy}>
-          <Text style={styles.tileTitle}>Expiring Soon</Text>
-          <Text style={styles.tileSubtitle}>Upcoming renewals</Text>
-        </View>
-        {expiringSoon ? (
-          <Text numberOfLines={1} style={styles.expiringSoonMeta}>
-            {expiringSoon.total} items need review
-          </Text>
-        ) : null}
-      </View>
-      {expiringSoon && expiringSoon.buckets.length ? (
-        <View style={styles.expiringSoonChartWrap}>
-          <BarChart bars={expiringSoon.buckets.map((bucket) => ({ ...bucket, label: formatExpiringSoonLabel(bucket.label) }))} height={138} />
-        </View>
-      ) : (
-        <EmptyAnalyticsState
-          body="You do not have any policies or contracts that need immediate attention."
-          icon="event-available"
-          label="Nothing is expiring soon"
-        />
-      )}
-    </View>
+    <BreakdownAnalyticsCard
+      breakdown={breakdown}
+      emptyBody="Once you add cover records, the dashboard will split them into active, due, and lapsed policies."
+      emptyLabel="No cover status data yet"
+      segmentColors={['#16A34A', '#2563EB', '#DC2626']}
+      subtitle="Active, due, and lapsed covers"
+      title="Percentage of Active Covers"
+    />
   );
 }
 
-export function StatusDistributionCard({ cards, chartWidth }: StatusDistributionCardProps) {
-  const items = cards.slice(0, 4).map((card) => ({
-    color:
-      card.key.includes('journal')
-        ? '#7C3AED'
-        : card.key.includes('contract')
-          ? '#64748B'
-          : card.key.includes('cover')
-            ? '#2563EB'
-            : '#0EA5E9',
-    label: shortLabel(card.label),
-    value: card.value,
-  }));
-
+export function ActiveContractsCard({
+  breakdown,
+}: {
+  breakdown?: DashboardAnalyticsResponse['performanceOutlook']['contractStatusBreakdown'];
+}) {
   return (
-    <View style={styles.analyticsCard}>
-      <View style={styles.cardMenuRow}>
-        <View>
-          <Text style={styles.tileTitle}>Workspace Activity</Text>
-          <Text style={styles.tileSubtitle}>By category</Text>
-        </View>
-      </View>
-
-      {items.length ? (
-        <>
-          <GroupedBarChart items={items} width={chartWidth - spacing.md * 2} />
-          <View style={styles.categoryLegend}>
-            {items.map((item) => (
-              <LegendDot key={item.label} color={item.color} label={item.label} />
-            ))}
-          </View>
-        </>
-      ) : (
-        <EmptyAnalyticsState
-          body="Once tasks, contracts, covers, and journals start moving, we will map the trend here."
-          icon="insights"
-          label="No category activity available"
-        />
-      )}
-    </View>
+    <BreakdownAnalyticsCard
+      breakdown={breakdown}
+      emptyBody="Once you add contract records, the dashboard will split them into active, expiring, and expired agreements."
+      emptyLabel="No contract status data yet"
+      segmentColors={['#16A34A', '#D97706', '#DC2626']}
+      subtitle="Active, expiring soon, and expired contracts"
+      title="Percentage of Active Contracts"
+    />
   );
 }
 
@@ -505,17 +389,6 @@ export function EmptyAnalyticsState({
   );
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <View style={styles.legendItem}>
-      <View style={[styles.legendDot, { backgroundColor: color }]} />
-      <Text numberOfLines={1} style={styles.legendLabel}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 function BreakdownRow({ color, label, value }: { color: string; label: string; value: string }) {
   return (
     <View style={styles.breakdownRow}>
@@ -530,53 +403,51 @@ function BreakdownRow({ color, label, value }: { color: string; label: string; v
   );
 }
 
-function shortLabel(label: string) {
-  if (label.toLowerCase().includes('journal')) {
-    return 'Journals';
-  }
-  if (label.toLowerCase().includes('contract')) {
-    return 'Contracts';
-  }
-  if (label.toLowerCase().includes('cover')) {
-    return 'Covers';
-  }
-  if (label.toLowerCase().includes('task')) {
-    return 'Tasks';
-  }
-  return label;
-}
+function BreakdownAnalyticsCard({
+  breakdown,
+  emptyBody,
+  emptyLabel,
+  segmentColors,
+  subtitle,
+  title,
+}: BreakdownAnalyticsCardProps) {
+  const items = breakdown?.items ?? [];
+  const total = breakdown?.total ?? 0;
 
-function compactBucketLabel(label: string) {
-  if (label.length <= 10) {
-    return label;
-  }
-  return label.replace(' days', 'd').replace(' day', 'd');
-}
+  return (
+    <View style={styles.analyticsCard}>
+      <Text style={styles.tileTitle}>{title}</Text>
+      <Text style={styles.tileSubtitle}>{subtitle}</Text>
 
-function formatExpiringSoonLabel(label: string) {
-  const compactLabel = compactBucketLabel(label);
+      {items.length && total > 0 ? (
+        <View style={styles.completionRow}>
+          <SegmentedDonutChart
+            centerLabel={`${total} total`}
+            centerValue="100%"
+            segments={items.map((item, index) => ({
+              color: segmentColors[index] ?? palette.primary,
+              value: item.count,
+            }))}
+            size={120}
+            strokeWidth={13}
+          />
 
-  if (label === '0-7 days') {
-    return `Covers ${compactLabel}`;
-  }
-
-  if (label === '8-30 days') {
-    return `Covers + Contracts ${compactLabel}`;
-  }
-
-  if (label === '31+ days') {
-    return `Covers ${compactLabel}`;
-  }
-
-  if (label.toLowerCase().includes('contract')) {
-    return `Contracts ${compactLabel.replace(/contracts?\s*/i, '').trim()}`.trim();
-  }
-
-  if (label.toLowerCase().includes('cover')) {
-    return `Covers ${compactLabel.replace(/covers?\s*/i, '').trim()}`.trim();
-  }
-
-  return compactLabel;
+          <View style={styles.breakdownList}>
+            {items.map((item, index) => (
+              <BreakdownRow
+                key={`${item.status}-${index}`}
+                color={segmentColors[index] ?? palette.primary}
+                label={item.status}
+                value={`${item.percentage}% (${item.count})`}
+              />
+            ))}
+          </View>
+        </View>
+      ) : (
+        <EmptyAnalyticsState body={emptyBody} icon="donut-large" label={emptyLabel} />
+      )}
+    </View>
+  );
 }
 
 function activityTagText(item: DashboardRecentActivity) {

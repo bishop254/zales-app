@@ -23,13 +23,12 @@ import { AppModal } from '@/components/app/app-modal';
 import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import {
   ActionNeededCard,
+  ActiveContractsCard,
+  ActiveCoversCard,
   CombinedHealthCard,
   DashboardSummaryAnalyticsCard,
   EmptyAnalyticsState,
-  ExpiringSoonChartCard,
-  PerformanceOutlookCard,
   RecentActivityList,
-  StatusDistributionCard,
   TaskCompletionCard,
 } from '@/components/dashboard/dashboard-analytics-sections';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
@@ -44,7 +43,6 @@ import { useToast } from '@/providers/toast-provider';
 type AdminAudienceMode = 'all_users' | 'specific_user';
 
 const SUMMARY_CARD_KEYS = ['tasks', 'contracts', 'covers', 'journals'];
-const PERFORMANCE_RANGE_OPTIONS = [3, 5, 7] as const;
 export default function DashboardScreen() {
   const { logout, session } = useAuth();
   const { showToast } = useToast();
@@ -55,7 +53,6 @@ export default function DashboardScreen() {
   const [adminPickerOpen, setAdminPickerOpen] = useState(false);
   const [summaryPage, setSummaryPage] = useState(0);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
-  const [performanceRange, setPerformanceRange] = useState<(typeof PERFORMANCE_RANGE_OPTIONS)[number]>(7);
   const isAdmin = session?.roles?.includes('ADMIN') ?? false;
 
   const {
@@ -97,7 +94,6 @@ export default function DashboardScreen() {
   const firstName = session?.firstName?.trim() || displayName.split(' ')[0] || 'Alex';
   const referralCode = session?.referralCode?.trim() || 'AGENT2024';
   const avatarLetter = displayName.slice(0, 1).toUpperCase();
-  const chartWidth = Math.max(width - spacing.marginMobile * 2 - spacing.md * 2, 200);
   const summaryCardWidth = Math.min(176, width * 0.42);
   const cardsLocked = !isAdmin && (subscriptionLoading || !hasActiveSubscription);
   const hasNotification = (analytics?.actionNeeded?.total ?? 0) > 0;
@@ -149,9 +145,9 @@ export default function DashboardScreen() {
   const hasDashboardContent =
     summaryCards.length > 0 ||
     recentActivityPreview.length > 0 ||
-    (analytics?.performanceOutlook.weeklyActivity.length ?? 0) > 0 ||
     Boolean(analytics?.performanceOutlook.taskCompletion) ||
-    Boolean(analytics?.performanceOutlook.expiringSoon?.buckets.length) ||
+    Boolean(analytics?.performanceOutlook.coverStatusBreakdown?.items.length) ||
+    Boolean(analytics?.performanceOutlook.contractStatusBreakdown?.items.length) ||
     Boolean(analytics?.subscription) ||
     Boolean(analytics?.supportHealth);
   const friendlyErrorBody = error.includes('Cannot GET')
@@ -170,16 +166,6 @@ export default function DashboardScreen() {
     [firstName, isAdmin],
   );
   const showInitialLoadingState = loading && !hasDashboardContent && !error;
-  const filteredPerformanceOutlook = useMemo(() => {
-    const weeklyActivity = analytics?.performanceOutlook.weeklyActivity ?? [];
-    const filteredActivity = weeklyActivity.slice(-Math.min(performanceRange, weeklyActivity.length));
-
-    return {
-      ...analytics?.performanceOutlook,
-      weeklyActivity: filteredActivity,
-    };
-  }, [analytics?.performanceOutlook, performanceRange]);
-
   useEffect(() => {
     if (!showInitialLoadingState) {
       setLoadingMessageIndex(0);
@@ -307,14 +293,6 @@ export default function DashboardScreen() {
     const pageWidth = (summaryCardWidth + spacing.md) * 2;
     const nextPage = Math.max(0, Math.min(summaryPages - 1, Math.round(event.nativeEvent.contentOffset.x / pageWidth)));
     setSummaryPage(nextPage);
-  }
-
-  function handlePerformanceRangePress() {
-    setPerformanceRange((current) => {
-      const currentIndex = PERFORMANCE_RANGE_OPTIONS.indexOf(current);
-      const nextIndex = (currentIndex + 1) % PERFORMANCE_RANGE_OPTIONS.length;
-      return PERFORMANCE_RANGE_OPTIONS[nextIndex];
-    });
   }
 
   function routeToModule(route?: string, entityType?: DashboardRecentActivity['type']) {
@@ -531,19 +509,6 @@ export default function DashboardScreen() {
             </View>
           ) : null}
 
-          {loading && !(analytics?.summaryCards?.length ?? 0) ? (
-            <View style={[styles.sectionSkeleton, styles.performanceSkeleton]} />
-          ) : (
-            <View style={styles.sectionWrap}>
-              <PerformanceOutlookCard
-                analytics={filteredPerformanceOutlook ?? { weeklyActivity: [] }}
-                chartWidth={chartWidth}
-                rangeLabel={`Last ${performanceRange} Days`}
-                onRangePress={handlePerformanceRangePress}
-              />
-            </View>
-          )}
-
           <View style={styles.analyticsGrid}>
             {loading && !(analytics?.summaryCards?.length ?? 0) ? (
               <>
@@ -552,16 +517,9 @@ export default function DashboardScreen() {
             ) : (
               <>
                 <TaskCompletionCard taskCompletion={analytics?.performanceOutlook.taskCompletion} />
-                <ExpiringSoonChartCard expiringSoon={analytics?.performanceOutlook.expiringSoon} />
+                <ActiveCoversCard breakdown={analytics?.performanceOutlook.coverStatusBreakdown} />
+                <ActiveContractsCard breakdown={analytics?.performanceOutlook.contractStatusBreakdown} />
               </>
-            )}
-          </View>
-
-          <View style={styles.sectionWrap}>
-            {loading && !(analytics?.summaryCards?.length ?? 0) ? (
-              <View style={styles.sectionSkeleton} />
-            ) : (
-              <StatusDistributionCard cards={summaryCards} chartWidth={chartWidth} />
             )}
           </View>
 

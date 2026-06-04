@@ -24,11 +24,25 @@ export interface TaskCompletionAnalytics {
   total: number;
   inProgress?: number;
   overdue?: number;
+  dueSoon?: number;
+  scheduled?: number;
+  breakdown?: BreakdownItem[];
 }
 
 export interface ExpiringSoonBucket {
   label: string;
   count: number;
+}
+
+export interface BreakdownItem {
+  status: string;
+  count: number;
+  percentage: number;
+}
+
+export interface EntityBreakdown {
+  total: number;
+  items: BreakdownItem[];
 }
 
 export interface DashboardRecentActivity {
@@ -62,6 +76,8 @@ export interface DashboardAnalyticsResponse {
       count: number;
       percentage: number;
     }>;
+    coverStatusBreakdown?: EntityBreakdown;
+    contractStatusBreakdown?: EntityBreakdown;
   };
   actionNeeded?: {
     total: number;

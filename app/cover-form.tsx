@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { AppMessageModal } from '@/components/app/app-message-modal';
 import { AppModal } from '@/components/app/app-modal';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
-import { AuthSearchSelectField, AuthSelectField, AuthTextField } from '@/components/auth/auth-primitives';
+import { AuthPressableField, AuthSearchSelectField, AuthSelectField, AuthTextField } from '@/components/auth/auth-primitives';
 import { africanCountries } from '@/constants/african-countries';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { UnauthorizedError } from '@/features/api/auth-session';
@@ -525,15 +525,14 @@ export default function CoverFormScreen() {
                     onBlur={() => markTouched('insurancePremium')}
                     onChangeText={(value) => updateForm('insurancePremium', value)}
                   />
-                  <AuthTextField
+                  <AuthPressableField
                     autoCapitalize="characters"
                     error={getFieldError('expiryDate')}
                     icon="event"
                     label="Expiry date"
                     placeholder="31 December 2026"
-                    showSoftInputOnFocus={false}
                     value={form.expiryDate ? formatReadableDate(form.expiryDate) : ''}
-                    onFocus={openDatePicker}
+                    onPress={openDatePicker}
                   />
                   <AuthSelectField
                     error={getFieldError('cycle')}

@@ -37,6 +37,36 @@ type UseDashboardAnalyticsResult = {
   setSelectedAdminUser: (user: AdminAnalyticsUserSummary | null) => void;
 };
 
+type LegacyEntityStats = {
+  active?: number;
+  expired?: number;
+  expiringSoon?: number;
+};
+
+type LegacyTaskStats = {
+  activeTasks?: number;
+  almostDueOccurrences?: number;
+  completedOccurrences?: number;
+  overdueOccurrences?: number;
+  totalOccurrences?: number;
+};
+
+type LegacyJournalStats = {
+  thisWeek?: number;
+  weeklyConsistencyRate?: number;
+};
+
+type RawDashboardAnalyticsResponse = DashboardAnalyticsResponse & {
+  contractStats?: LegacyEntityStats;
+  coverStats?: LegacyEntityStats & {
+    expiring0to7?: number;
+    expiring8to30?: number;
+    expiring31plus?: number;
+  };
+  journalStats?: LegacyJournalStats;
+  taskStats?: LegacyTaskStats;
+};
+
 const EMPTY_ANALYTICS: DashboardAnalyticsResponse = {
   summaryCards: [],
   performanceOutlook: {
@@ -107,16 +137,159 @@ function normalizeRecentActivity(activity: DashboardRecentActivity[]): Dashboard
   }));
 }
 
-function normalizeUserAnalytics(analytics: DashboardAnalyticsResponse): DashboardAnalyticsResponse {
+function buildBreakdown(
+  items: Array<{ count?: number | null; status: string }>,
+): { count: number; percentage: number; status: string }[] {
+  const safeItems = items.map((item) => ({
+    count: Math.max(0, item.count ?? 0),
+    status: item.status,
+  }));
+  const total = safeItems.reduce((sum, item) => sum + item.count, 0);
+
+  if (total <= 0) {
+    return safeItems.map((item) => ({ ...item, percentage: 0 }));
+  }
+
+  return safeItems.map((item) => ({
+    ...item,
+    percentage: Math.round((item.count / total) * 100),
+  }));
+}
+
+function buildEntityBreakdown(items: Array<{ count?: number | null; status: string }>) {
+  const normalizedItems = buildBreakdown(items);
+  return {
+    items: normalizedItems,
+    total: normalizedItems.reduce((sum, item) => sum + item.count, 0),
+  };
+}
+
+function buildLegacySummaryCards(analytics: RawDashboardAnalyticsResponse): DashboardSummaryCard[] {
+  const taskStats = analytics.taskStats;
+  const contractStats = analytics.contractStats;
+  const coverStats = analytics.coverStats;
+  const journalStats = analytics.journalStats;
+
+  if (!taskStats && !contractStats && !coverStats && !journalStats) {
+    return [];
+  }
+
+  return [
+    {
+      key: 'tasks',
+      label: 'Tasks',
+      category: 'OVERVIEW',
+      value: taskStats?.activeTasks ?? 0,
+      subtitle: 'Open tasks',
+      trendPercentage: 0,
+      trendDirection: 'neutral',
+      icon: 'clipboard',
+    },
+    {
+      key: 'contracts',
+      label: 'Contracts',
+      category: 'ACTIVE',
+      value: contractStats?.active ?? 0,
+      subtitle: 'Active contracts',
+      trendPercentage: 0,
+      trendDirection: 'neutral',
+      icon: 'document',
+    },
+    {
+      key: 'covers',
+      label: 'Insurance',
+      category: 'POLICIES',
+      value: coverStats?.active ?? 0,
+      subtitle: 'Active covers',
+      trendPercentage: 0,
+      trendDirection: 'neutral',
+      icon: 'shield',
+    },
+    {
+      key: 'journals',
+      label: 'Journal Entries',
+      category: 'DAILY LOG',
+      value: journalStats?.thisWeek ?? 0,
+      subtitle: 'This week',
+      trendPercentage: Math.round(journalStats?.weeklyConsistencyRate ?? 0),
+      trendDirection: toTrendDirection(journalStats?.weeklyConsistencyRate ?? 0),
+      icon: 'book',
+    },
+  ];
+}
+
+function buildLegacyTaskCompletion(analytics: RawDashboardAnalyticsResponse) {
+  const taskCompletion = analytics.performanceOutlook?.taskCompletion;
+  if (taskCompletion) {
+    return {
+      ...taskCompletion,
+      breakdown:
+        taskCompletion.breakdown ??
+        buildBreakdown([
+          { status: 'Completed', count: taskCompletion.completed },
+          { status: 'Overdue', count: taskCompletion.overdue },
+          { status: 'Due Soon', count: taskCompletion.dueSoon },
+          { status: 'Not Yet Due / Scheduled', count: taskCompletion.scheduled },
+        ]),
+    };
+  }
+
+  const taskStats = analytics.taskStats;
+  if (!taskStats) {
+    return undefined;
+  }
+
+  const total = taskStats.totalOccurrences ?? 0;
+  const completed = taskStats.completedOccurrences ?? 0;
+  const overdue = taskStats.overdueOccurrences ?? 0;
+  const dueSoon = taskStats.almostDueOccurrences ?? 0;
+  const scheduled = Math.max(total - completed - overdue - dueSoon, 0);
+
+  return {
+    breakdown: buildBreakdown([
+      { status: 'Completed', count: completed },
+      { status: 'Overdue', count: overdue },
+      { status: 'Due Soon', count: dueSoon },
+      { status: 'Not Yet Due / Scheduled', count: scheduled },
+    ]),
+    completed,
+    completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+    dueSoon,
+    inProgress: taskStats.activeTasks ?? 0,
+    overdue,
+    scheduled,
+    total,
+  };
+}
+
+function normalizeUserAnalytics(analytics: RawDashboardAnalyticsResponse): DashboardAnalyticsResponse {
+  const legacyCoverBreakdown =
+    analytics.coverStats &&
+    buildEntityBreakdown([
+      { status: 'Active', count: (analytics.coverStats.active ?? 0) - (analytics.coverStats.expiringSoon ?? 0) },
+      { status: 'Due', count: analytics.coverStats.expiringSoon },
+      { status: 'Lapsed', count: analytics.coverStats.expired },
+    ]);
+
+  const legacyContractBreakdown =
+    analytics.contractStats &&
+    buildEntityBreakdown([
+      { status: 'Active', count: (analytics.contractStats.active ?? 0) - (analytics.contractStats.expiringSoon ?? 0) },
+      { status: 'Expiring Soon', count: analytics.contractStats.expiringSoon },
+      { status: 'Expired', count: analytics.contractStats.expired },
+    ]);
+
   return {
     ...analytics,
-    summaryCards: analytics.summaryCards ?? [],
+    summaryCards: analytics.summaryCards?.length ? analytics.summaryCards : buildLegacySummaryCards(analytics),
     performanceOutlook: {
       overallActivity: analytics.performanceOutlook?.overallActivity,
       weeklyActivity: analytics.performanceOutlook?.weeklyActivity ?? [],
-      taskCompletion: analytics.performanceOutlook?.taskCompletion,
+      taskCompletion: buildLegacyTaskCompletion(analytics),
       expiringSoon: analytics.performanceOutlook?.expiringSoon,
       statusDistribution: analytics.performanceOutlook?.statusDistribution ?? [],
+      coverStatusBreakdown: analytics.performanceOutlook?.coverStatusBreakdown ?? legacyCoverBreakdown,
+      contractStatusBreakdown: analytics.performanceOutlook?.contractStatusBreakdown ?? legacyContractBreakdown,
     },
     actionNeeded: analytics.actionNeeded ?? { total: 0, items: [] },
     recentActivity: normalizeRecentActivity(analytics.recentActivity ?? []),
@@ -229,6 +402,17 @@ function normalizeAdminAnalytics(admin: AdminDashboardAnalyticsResponse): Dashbo
         total: admin.entities.totalTasks + admin.entities.totalJournals,
         inProgress: admin.entities.totalTasks,
         overdue: admin.subscriptions.expired,
+        dueSoon: 0,
+        scheduled: 0,
+        breakdown: [],
+      },
+      coverStatusBreakdown: {
+        total: 0,
+        items: [],
+      },
+      contractStatusBreakdown: {
+        total: 0,
+        items: [],
       },
     },
     actionNeeded: {
