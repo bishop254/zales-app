@@ -130,3 +130,6 @@ Good next slices after this starter:
 3. lead list and lead detail screens
 4. activity timeline
 5. KPI filters and territory switching
+
+
+```eas build --platform android --profile preview```
