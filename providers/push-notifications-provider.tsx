@@ -144,8 +144,7 @@ export function PushNotificationsProvider({ children }: PropsWithChildren) {
         return;
       }
 
-      const message =
-        error instanceof Error ? error.message : 'Failed to register push notifications.';
+      const message = getPushRegistrationErrorMessage(error);
       showToast(message, 'error');
     });
 
@@ -189,4 +188,21 @@ function allowsNotifications(
     normalized.ios?.status === Notifications.IosAuthorizationStatus.AUTHORIZED ||
     normalized.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
   );
+}
+
+function getPushRegistrationErrorMessage(error: unknown): string {
+  const fallback = 'Failed to register push notifications.';
+
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+
+  if (
+    Platform.OS === 'android' &&
+    error.message.includes('Default FirebaseApp is not initialized')
+  ) {
+    return 'Android push notifications are not configured yet. Add google-services.json and rebuild the app.';
+  }
+
+  return error.message || fallback;
 }
