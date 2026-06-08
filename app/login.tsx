@@ -2,14 +2,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { AppModal } from '@/components/app/app-modal';
 import { AuthBackground, AuthButton, AuthCard, AuthTextField } from '@/components/auth/auth-primitives';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { validateEmail, validatePassword } from '@/features/auth/validation';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/providers/toast-provider';
+import { AppFeedbackModal } from '@/src/components/common/AppFeedbackModal';
 
 type FeedbackModalState = {
   eyebrow: string;
@@ -201,41 +201,52 @@ export default function LoginScreen() {
         </AuthCard>
       </AuthBackground>
 
-      <AppModal
-        eyebrow={feedbackModal.eyebrow}
-        footer={
-          <Pressable
-            style={[
-              styles.modalButton,
-              feedbackModal.tone === 'error' ? styles.modalButtonError : null,
-            ]}
-            onPress={closeFeedbackModal}>
-            <Text style={styles.modalButtonText}>Okay</Text>
-          </Pressable>
-        }
-        title={feedbackModal.title}
+      <AppFeedbackModal
         visible={feedbackModal.visible}
-        onClose={closeFeedbackModal}>
-        <View style={styles.modalNotice}>
-          <View
-            style={[
-              styles.modalIconWrap,
-              feedbackModal.tone === 'error' ? styles.modalIconWrapError : styles.modalIconWrapInfo,
-            ]}>
-            <MaterialIcons
-              color={feedbackModal.tone === 'error' ? palette.error : palette.primary}
-              name={feedbackModal.tone === 'error' ? 'error-outline' : 'info-outline'}
-              size={24}
-            />
-          </View>
-          <View style={styles.modalCopy}>
-            <Text style={styles.modalHeading}>
-              {feedbackModal.tone === 'error' ? "We couldn't complete that sign-in." : 'A quick update for you'}
-            </Text>
-            <Text style={styles.modalMessage}>{feedbackModal.message}</Text>
-          </View>
-        </View>
-      </AppModal>
+        detailDescription={
+          feedbackModal.tone === 'error'
+            ? feedbackModal.message
+            : feedbackModal.message
+        }
+        detailTitle={
+          feedbackModal.tone === 'error'
+            ? feedbackModal.eyebrow === 'Sign-in error'
+              ? 'Invalid credentials'
+              : 'Sign-in issue'
+            : 'Update'
+        }
+        label={feedbackModal.eyebrow}
+        message={
+          feedbackModal.tone === 'error'
+            ? feedbackModal.eyebrow === 'Sign-in error'
+              ? 'Your email or password may be incorrect. Please check your details and try again.'
+              : 'We hit a problem while trying to sign you in. Please review the details below and try again.'
+            : feedbackModal.message
+        }
+        onClose={closeFeedbackModal}
+        onPrimaryAction={closeFeedbackModal}
+        primaryActionLabel={feedbackModal.tone === 'error' ? 'Try Again' : 'Okay'}
+        secondaryActionLabel={feedbackModal.tone === 'error' ? 'Forgot Password?' : undefined}
+        title={
+          feedbackModal.tone === 'error' && feedbackModal.eyebrow === 'Sign-in error'
+            ? "Couldn't sign you in"
+            : feedbackModal.title
+        }
+        type={feedbackModal.tone}
+        onSecondaryAction={
+          feedbackModal.tone === 'error'
+            ? () => {
+                closeFeedbackModal();
+                openFeedbackModal({
+                  eyebrow: 'Coming soon',
+                  message: 'Password recovery is not wired yet.',
+                  title: 'Forgot password',
+                  tone: 'info',
+                });
+              }
+            : undefined
+        }
+      />
     </>
   );
 }
@@ -284,58 +295,5 @@ const styles = StyleSheet.create({
     color: palette.onSurfaceVariant,
     fontSize: typography.bodySmall,
     textAlign: 'center',
-  },
-  modalButton: {
-    alignItems: 'center',
-    backgroundColor: palette.primary,
-    borderRadius: radius.md,
-    justifyContent: 'center',
-    minHeight: 52,
-    paddingHorizontal: spacing.lg,
-  },
-  modalButtonError: {
-    backgroundColor: palette.error,
-  },
-  modalButtonText: {
-    color: palette.onPrimary,
-    fontSize: typography.body,
-    fontWeight: '700',
-  },
-  modalCopy: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  modalHeading: {
-    color: palette.onSurface,
-    fontSize: typography.title,
-    fontWeight: '700',
-  },
-  modalIconWrap: {
-    alignItems: 'center',
-    borderRadius: radius.lg,
-    height: 52,
-    justifyContent: 'center',
-    width: 52,
-  },
-  modalIconWrapError: {
-    backgroundColor: palette.errorContainer,
-  },
-  modalIconWrapInfo: {
-    backgroundColor: palette.primaryFixed,
-  },
-  modalMessage: {
-    color: palette.onSurfaceVariant,
-    fontSize: typography.body,
-    lineHeight: 22,
-  },
-  modalNotice: {
-    alignItems: 'flex-start',
-    backgroundColor: palette.surfaceContainerLowest,
-    borderColor: palette.outlineVariant,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.md,
   },
 });

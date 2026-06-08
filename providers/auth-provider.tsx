@@ -165,7 +165,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
 
       const result = await verifyOtp(pendingChallenge.token, otp);
-      console.log('[Auth] OTP verification succeeded. Bearer token:', result.accessToken);
       applyAuthResult(result);
     },
     [applyAuthResult, pendingChallenge]

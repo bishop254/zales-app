@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppMessageModal } from '@/components/app/app-message-modal';
@@ -37,14 +37,8 @@ export default function VerifyScreen() {
     visible: false,
   });
   const inputRefs = useRef<(TextInput | null)[]>([]);
-  const { width } = useWindowDimensions();
 
   const otpValue = useMemo(() => otp.join(''), [otp]);
-  const otpCellSize = useMemo(() => {
-    const availableWidth = Math.min(width - spacing.xl * 2, 360);
-    const totalGap = spacing.xs * (otp.length - 1);
-    return Math.max(36, Math.min(46, Math.floor((availableWidth - totalGap) / otp.length)));
-  }, [otp.length, width]);
 
   useEffect(() => {
     if (resendCountdown <= 0) {
@@ -180,7 +174,7 @@ export default function VerifyScreen() {
                 maxLength={1}
                 placeholder="."
                 placeholderTextColor={palette.onSurfaceVariant}
-                style={[styles.otpCell, { width: otpCellSize, height: otpCellSize + 14 }]}
+                style={styles.otpCell}
                 textAlign="center"
                 value={digit}
                 onChangeText={(nextValue) => {
@@ -261,10 +255,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     color: palette.onSurface,
+    flex: 1,
     fontSize: typography.headline,
     fontWeight: '600',
     height: 60,
-    width: 46,
+    maxWidth: 46,
+    minWidth: 0,
   },
   otpRow: {
     alignSelf: 'center',

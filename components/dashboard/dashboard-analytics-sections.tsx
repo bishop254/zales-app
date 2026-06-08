@@ -1,16 +1,16 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { MaterialIcons } from "@expo/vector-icons";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { StyleProp, ViewStyle } from "react-native";
 
-import { SegmentedDonutChart } from '@/components/charts/donut-chart';
-import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { SegmentedDonutChart } from "@/components/charts/donut-chart";
+import { palette, radius, spacing, typography } from "@/constants/app-theme";
 import type {
   DashboardAnalyticsResponse,
   DashboardRecentActivity,
   DashboardSummaryCard,
   EntityBreakdown,
   TrendDirection,
-} from '@/features/analytics/analytics-types';
+} from "@/features/analytics/analytics-types";
 
 type SummaryCardProps = {
   card: DashboardSummaryCard;
@@ -25,82 +25,124 @@ type RecentActivityListProps = {
 };
 
 type TaskCompletionCardProps = {
-  taskCompletion?: DashboardAnalyticsResponse['performanceOutlook']['taskCompletion'];
+  taskCompletion?: DashboardAnalyticsResponse["performanceOutlook"]["taskCompletion"];
 };
 
 type BreakdownAnalyticsCardProps = {
   breakdown?: EntityBreakdown;
   emptyBody: string;
   emptyLabel: string;
-  segmentColors: string[];
+  segmentColors: Record<string, string>;
   subtitle: string;
   title: string;
 };
 
 type ActionNeededCardProps = {
-  actionNeeded?: DashboardAnalyticsResponse['actionNeeded'];
+  actionNeeded?: DashboardAnalyticsResponse["actionNeeded"];
   onRoutePress: (route?: string) => void;
 };
 
 type SubscriptionCardProps = {
-  subscription?: DashboardAnalyticsResponse['subscription'];
+  subscription?: DashboardAnalyticsResponse["subscription"];
 };
 
 type SupportHealthCardProps = {
-  supportHealth?: DashboardAnalyticsResponse['supportHealth'];
+  supportHealth?: DashboardAnalyticsResponse["supportHealth"];
 };
 
 type CombinedHealthCardProps = {
-  subscription?: DashboardAnalyticsResponse['subscription'];
-  supportHealth?: DashboardAnalyticsResponse['supportHealth'];
+  subscription?: DashboardAnalyticsResponse["subscription"];
+  supportHealth?: DashboardAnalyticsResponse["supportHealth"];
 };
 
 type EmptyAnalyticsStateProps = {
   body?: string;
   icon?: keyof typeof MaterialIcons.glyphMap;
   label: string;
-  size?: 'compact' | 'default' | 'tall';
+  size?: "compact" | "default" | "tall";
 };
 
 const summaryIconMap: Record<string, keyof typeof MaterialIcons.glyphMap> = {
-  book: 'menu-book',
-  clipboard: 'assignment',
-  'contact-support': 'contact-support',
-  document: 'description',
-  people: 'groups',
-  shield: 'shield',
-  'verified-user': 'verified-user',
+  book: "menu-book",
+  clipboard: "assignment",
+  "contact-support": "contact-support",
+  document: "description",
+  people: "groups",
+  shield: "shield",
+  "verified-user": "verified-user",
 };
 
 const summaryIconTintMap: Record<string, { bg: string; color: string }> = {
-  book: { bg: 'rgba(147,51,234,0.12)', color: '#7C3AED' },
-  clipboard: { bg: 'rgba(0,92,171,0.1)', color: palette.primary },
-  'contact-support': { bg: 'rgba(249,115,22,0.12)', color: '#EA580C' },
-  document: { bg: 'rgba(100,116,139,0.12)', color: '#64748B' },
-  shield: { bg: 'rgba(0,92,171,0.1)', color: palette.primary },
+  book: { bg: "rgba(147,51,234,0.12)", color: "#7C3AED" },
+  clipboard: { bg: "rgba(0,92,171,0.1)", color: palette.primary },
+  "contact-support": { bg: "rgba(249,115,22,0.12)", color: "#EA580C" },
+  document: { bg: "rgba(100,116,139,0.12)", color: "#64748B" },
+  shield: { bg: "rgba(0,92,171,0.1)", color: palette.primary },
+};
+
+const taskStatusChartColors: Record<string, string> = {
+  Completed: "#16A34A",
+  Overdue: "#BA1A1A",
+  "Due Soon": "#F59E0B",
+  Scheduled: "#2563EB",
+  "Not Yet Due / Scheduled": "#2563EB",
+};
+
+const coverStatusChartColors: Record<string, string> = {
+  Active: "#16A34A",
+  Due: "#F59E0B",
+  Lapsed: "#BA1A1A",
+};
+
+const contractStatusChartColors: Record<string, string> = {
+  Active: "#16A34A",
+  "Expiring Soon": "#F59E0B",
+  Expired: "#BA1A1A",
+  Upcoming: "#2563EB",
 };
 
 function trendStyles(direction?: TrendDirection) {
-  if (direction === 'up') {
-    return { bg: 'rgba(22,163,74,0.1)', color: '#16A34A', icon: 'arrow-upward' as const };
+  if (direction === "up") {
+    return {
+      bg: "rgba(22,163,74,0.1)",
+      color: "#16A34A",
+      icon: "arrow-upward" as const,
+    };
   }
 
-  if (direction === 'down') {
-    return { bg: 'rgba(239,68,68,0.1)', color: '#EF4444', icon: 'arrow-downward' as const };
+  if (direction === "down") {
+    return {
+      bg: "rgba(239,68,68,0.1)",
+      color: "#EF4444",
+      icon: "arrow-downward" as const,
+    };
   }
 
-  return { bg: 'rgba(100,116,139,0.12)', color: '#64748B', icon: 'remove' as const };
+  return {
+    bg: "rgba(100,116,139,0.12)",
+    color: "#64748B",
+    icon: "remove" as const,
+  };
 }
 
-export function DashboardSummaryAnalyticsCard({ card, onPress, style }: SummaryCardProps) {
-  const iconName = summaryIconMap[card.icon ?? ''] ?? 'insights';
-  const iconTint = summaryIconTintMap[card.icon ?? ''] ?? { bg: 'rgba(0,92,171,0.1)', color: palette.primary };
+export function DashboardSummaryAnalyticsCard({
+  card,
+  onPress,
+  style,
+}: SummaryCardProps) {
+  const iconName = summaryIconMap[card.icon ?? ""] ?? "insights";
+  const iconTint = summaryIconTintMap[card.icon ?? ""] ?? {
+    bg: "rgba(0,92,171,0.1)",
+    color: palette.primary,
+  };
   const trend = trendStyles(card.trendDirection);
 
   return (
     <Pressable style={[styles.summaryCard, style]} onPress={onPress}>
       <View style={styles.summaryMetricRow}>
-        <View style={[styles.summaryIconWrap, { backgroundColor: iconTint.bg }]}>
+        <View
+          style={[styles.summaryIconWrap, { backgroundColor: iconTint.bg }]}
+        >
           <MaterialIcons color={iconTint.color} name={iconName} size={22} />
         </View>
         <Text style={styles.summaryValue}>{card.value}</Text>
@@ -116,16 +158,21 @@ export function DashboardSummaryAnalyticsCard({ card, onPress, style }: SummaryC
 
       <View style={[styles.summaryTrendRow, { backgroundColor: trend.bg }]}>
         <MaterialIcons color={trend.color} name={trend.icon} size={13} />
-        <Text numberOfLines={1} style={[styles.summaryTrendText, { color: trend.color }]}>
-          {card.trendPercentage ? `${Math.abs(card.trendPercentage)}%` : '0%'}
-          {card.trendDirection === 'neutral' ? ' stable' : ' vs last week'}
+        <Text
+          numberOfLines={1}
+          style={[styles.summaryTrendText, { color: trend.color }]}
+        >
+          {card.trendPercentage ? `${Math.abs(card.trendPercentage)}%` : "0%"}
+          {card.trendDirection === "neutral" ? " stable" : " vs last week"}
         </Text>
       </View>
     </Pressable>
   );
 }
 
-export function TaskCompletionCard({ taskCompletion }: TaskCompletionCardProps) {
+export function TaskCompletionCard({
+  taskCompletion,
+}: TaskCompletionCardProps) {
   return (
     <BreakdownAnalyticsCard
       breakdown={
@@ -138,7 +185,7 @@ export function TaskCompletionCard({ taskCompletion }: TaskCompletionCardProps) 
       }
       emptyBody="As your schedule fills up, completed, overdue, due soon, and scheduled tasks will appear here."
       emptyLabel="No task completion insights yet"
-      segmentColors={[palette.primaryContainer, '#D97706', '#2563EB', '#CBD5E1']}
+      segmentColors={taskStatusChartColors}
       subtitle="Completed, overdue, due soon, and scheduled"
       title="Task Completion Rate"
     />
@@ -148,14 +195,14 @@ export function TaskCompletionCard({ taskCompletion }: TaskCompletionCardProps) 
 export function ActiveCoversCard({
   breakdown,
 }: {
-  breakdown?: DashboardAnalyticsResponse['performanceOutlook']['coverStatusBreakdown'];
+  breakdown?: DashboardAnalyticsResponse["performanceOutlook"]["coverStatusBreakdown"];
 }) {
   return (
     <BreakdownAnalyticsCard
       breakdown={breakdown}
       emptyBody="Once you add cover records, the dashboard will split them into active, due, and lapsed policies."
       emptyLabel="No cover status data yet"
-      segmentColors={['#16A34A', '#2563EB', '#DC2626']}
+      segmentColors={coverStatusChartColors}
       subtitle="Active, due, and lapsed covers"
       title="Percentage of Active Covers"
     />
@@ -165,21 +212,24 @@ export function ActiveCoversCard({
 export function ActiveContractsCard({
   breakdown,
 }: {
-  breakdown?: DashboardAnalyticsResponse['performanceOutlook']['contractStatusBreakdown'];
+  breakdown?: DashboardAnalyticsResponse["performanceOutlook"]["contractStatusBreakdown"];
 }) {
   return (
     <BreakdownAnalyticsCard
       breakdown={breakdown}
       emptyBody="Once you add contract records, the dashboard will split them into active, expiring, and expired agreements."
       emptyLabel="No contract status data yet"
-      segmentColors={['#16A34A', '#D97706', '#DC2626']}
+      segmentColors={contractStatusChartColors}
       subtitle="Active, expiring soon, and expired contracts"
       title="Percentage of Active Contracts"
     />
   );
 }
 
-export function ActionNeededCard({ actionNeeded, onRoutePress }: ActionNeededCardProps) {
+export function ActionNeededCard({
+  actionNeeded,
+  onRoutePress,
+}: ActionNeededCardProps) {
   if (!actionNeeded || actionNeeded.total <= 0) {
     return null;
   }
@@ -195,15 +245,29 @@ export function ActionNeededCard({ actionNeeded, onRoutePress }: ActionNeededCar
 
       <View style={styles.actionList}>
         {actionNeeded.items.map((item) => (
-          <Pressable key={`${item.type}-${item.title}`} style={styles.actionRow} onPress={() => onRoutePress(item.route)}>
+          <Pressable
+            key={`${item.type}-${item.title}`}
+            style={styles.actionRow}
+            onPress={() => onRoutePress(item.route)}
+          >
             <View style={styles.actionIconWrap}>
-              <MaterialIcons color={palette.error} name="priority-high" size={18} />
+              <MaterialIcons
+                color={palette.error}
+                name="priority-high"
+                size={18}
+              />
             </View>
             <View style={styles.actionCopy}>
               <Text style={styles.actionTitle}>{item.title}</Text>
-              <Text style={styles.actionSubtitle}>{item.subtitle ?? 'Needs attention'}</Text>
+              <Text style={styles.actionSubtitle}>
+                {item.subtitle ?? "Needs attention"}
+              </Text>
             </View>
-            <MaterialIcons color={palette.error} name="chevron-right" size={20} />
+            <MaterialIcons
+              color={palette.error}
+              name="chevron-right"
+              size={20}
+            />
           </Pressable>
         ))}
       </View>
@@ -216,21 +280,44 @@ export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
     return null;
   }
 
+  const normalizedPlanName = (subscription.planName ?? '').toLowerCase();
+  const isMonthlyPlan =
+    normalizedPlanName.includes('monthly') || normalizedPlanName.includes('month');
+  const isAnnualPlan =
+    normalizedPlanName.includes('annual') || normalizedPlanName.includes('year');
+  const planDurationDays = isMonthlyPlan ? 30 : 365;
+  const planHint = isMonthlyPlan
+    ? "You're on the monthly plan."
+    : isAnnualPlan
+      ? "You're on the annual plan."
+      : "You're on an active plan.";
   const daysRemaining = subscription.daysRemaining ?? 0;
-  const progress = Math.max(0, Math.min(100, Math.round((daysRemaining / Math.max(daysRemaining, 365)) * 100)));
+  const progress = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round((daysRemaining / Math.max(daysRemaining, planDurationDays)) * 100),
+    ),
+  );
 
   return (
     <View style={styles.featureCard}>
       <View style={styles.cardHeader}>
         <Text style={styles.featureTitle}>Subscription</Text>
         <View style={styles.planPill}>
-          <Text style={styles.planPillText}>{subscription.planName ?? subscription.status}</Text>
+          <Text style={styles.planPillText}>
+            {subscription.planName ?? subscription.status}
+          </Text>
         </View>
       </View>
 
       <View style={styles.featureBodyRow}>
         <View style={styles.featureIconWrap}>
-          <MaterialIcons color={palette.primary} name="workspace-premium" size={24} />
+          <MaterialIcons
+            color={palette.primary}
+            name="workspace-premium"
+            size={24}
+          />
         </View>
 
         <View style={styles.featureBodyCopy}>
@@ -239,7 +326,7 @@ export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
             {subscription.validUntil ?? subscription.status}
           </Text>
           <Text numberOfLines={1} style={styles.featureMetaHint}>
-            You&apos;re on the annual plan.
+            {planHint}
           </Text>
         </View>
       </View>
@@ -281,7 +368,7 @@ export function SupportHealthCard({ supportHealth }: SupportHealthCardProps) {
           </Text>
           <Text style={styles.featureMetaLabel}>Average response time</Text>
           <Text numberOfLines={2} style={styles.supportTime}>
-            {supportHealth.averageResponseTime ?? 'Not available'}
+            {supportHealth.averageResponseTime ?? "Not available"}
           </Text>
         </View>
       </View>
@@ -296,7 +383,10 @@ export function SupportHealthCard({ supportHealth }: SupportHealthCardProps) {
   );
 }
 
-export function CombinedHealthCard({ subscription, supportHealth }: CombinedHealthCardProps) {
+export function CombinedHealthCard({
+  subscription,
+  supportHealth,
+}: CombinedHealthCardProps) {
   if (!subscription && !supportHealth) {
     return null;
   }
@@ -317,7 +407,11 @@ export function CombinedHealthCard({ subscription, supportHealth }: CombinedHeal
   );
 }
 
-export function RecentActivityList({ items, onItemPress, onViewAll }: RecentActivityListProps) {
+export function RecentActivityList({
+  items,
+  onItemPress,
+  onViewAll,
+}: RecentActivityListProps) {
   return (
     <View>
       <View style={styles.recentHeader}>
@@ -334,10 +428,23 @@ export function RecentActivityList({ items, onItemPress, onViewAll }: RecentActi
           items.map((item, index) => (
             <Pressable
               key={item.id}
-              style={[styles.activityRow, index < items.length - 1 ? styles.activityRowBorder : null]}
-              onPress={() => onItemPress(item)}>
-              <View style={[styles.activityIconWrap, { backgroundColor: activityIconTone(item.type) }]}>
-                <MaterialIcons color={activityIconColor(item.type)} name={activityIconForType(item.type)} size={18} />
+              style={[
+                styles.activityRow,
+                index < items.length - 1 ? styles.activityRowBorder : null,
+              ]}
+              onPress={() => onItemPress(item)}
+            >
+              <View
+                style={[
+                  styles.activityIconWrap,
+                  { backgroundColor: activityIconTone(item.type) },
+                ]}
+              >
+                <MaterialIcons
+                  color={activityIconColor(item.type)}
+                  name={activityIconForType(item.type)}
+                  size={18}
+                />
               </View>
 
               <View style={styles.activityCopy}>
@@ -345,17 +452,27 @@ export function RecentActivityList({ items, onItemPress, onViewAll }: RecentActi
                   {item.title}
                 </Text>
                 <Text numberOfLines={1} style={styles.activitySubtitle}>
-                  {item.subtitle || 'Recent update'}
+                  {item.subtitle || "Recent update"}
                 </Text>
               </View>
 
               <View style={styles.activityTrail}>
                 <View style={styles.activityTag}>
-                  <Text numberOfLines={1} style={[styles.activityTagText, { color: activityIconColor(item.type) }]}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.activityTagText,
+                      { color: activityIconColor(item.type) },
+                    ]}
+                  >
                     {activityTagText(item)}
                   </Text>
                 </View>
-                <MaterialIcons color={palette.outline} name="chevron-right" size={18} />
+                <MaterialIcons
+                  color={palette.outline}
+                  name="chevron-right"
+                  size={18}
+                />
               </View>
             </Pressable>
           ))
@@ -374,9 +491,9 @@ export function RecentActivityList({ items, onItemPress, onViewAll }: RecentActi
 
 export function EmptyAnalyticsState({
   body,
-  icon = 'insert-chart-outlined',
+  icon = "insert-chart-outlined",
   label,
-  size = 'default',
+  size = "default",
 }: EmptyAnalyticsStateProps) {
   return (
     <View style={[styles.emptyAnalytics, emptySizeStyles[size]]}>
@@ -389,7 +506,15 @@ export function EmptyAnalyticsState({
   );
 }
 
-function BreakdownRow({ color, label, value }: { color: string; label: string; value: string }) {
+function BreakdownRow({
+  color,
+  label,
+  value,
+}: {
+  color: string;
+  label: string;
+  value: string;
+}) {
   return (
     <View style={styles.breakdownRow}>
       <View style={styles.breakdownLabelRow}>
@@ -413,6 +538,8 @@ function BreakdownAnalyticsCard({
 }: BreakdownAnalyticsCardProps) {
   const items = breakdown?.items ?? [];
   const total = breakdown?.total ?? 0;
+  const colorForStatus = (status: string) =>
+    segmentColors[status] ?? palette.primary;
 
   return (
     <View style={styles.analyticsCard}>
@@ -425,7 +552,7 @@ function BreakdownAnalyticsCard({
             centerLabel={`${total} total`}
             centerValue="100%"
             segments={items.map((item, index) => ({
-              color: segmentColors[index] ?? palette.primary,
+              color: colorForStatus(item.status),
               value: item.count,
             }))}
             size={120}
@@ -436,7 +563,7 @@ function BreakdownAnalyticsCard({
             {items.map((item, index) => (
               <BreakdownRow
                 key={`${item.status}-${index}`}
-                color={segmentColors[index] ?? palette.primary}
+                color={colorForStatus(item.status)}
                 label={item.status}
                 value={`${item.percentage}% (${item.count})`}
               />
@@ -444,7 +571,11 @@ function BreakdownAnalyticsCard({
           </View>
         </View>
       ) : (
-        <EmptyAnalyticsState body={emptyBody} icon="donut-large" label={emptyLabel} />
+        <EmptyAnalyticsState
+          body={emptyBody}
+          icon="donut-large"
+          label={emptyLabel}
+        />
       )}
     </View>
   );
@@ -454,53 +585,55 @@ function activityTagText(item: DashboardRecentActivity) {
   if (item.status) {
     return item.status;
   }
-  return item.type.replace('_', ' ');
+  return item.type.replace("_", " ");
 }
 
-function activityIconForType(type: DashboardRecentActivity['type']): keyof typeof MaterialIcons.glyphMap {
+function activityIconForType(
+  type: DashboardRecentActivity["type"],
+): keyof typeof MaterialIcons.glyphMap {
   switch (type) {
-    case 'BILLING':
-      return 'receipt-long';
-    case 'CONTRACT':
-      return 'description';
-    case 'COVER':
-      return 'shield';
-    case 'JOURNAL':
-      return 'menu-book';
-    case 'SUPPORT_TICKET':
-      return 'contact-support';
-    case 'TASK':
-      return 'assignment';
+    case "BILLING":
+      return "receipt-long";
+    case "CONTRACT":
+      return "description";
+    case "COVER":
+      return "shield";
+    case "JOURNAL":
+      return "menu-book";
+    case "SUPPORT_TICKET":
+      return "contact-support";
+    case "TASK":
+      return "assignment";
     default:
-      return 'insights';
+      return "insights";
   }
 }
 
-function activityIconTone(type: DashboardRecentActivity['type']) {
+function activityIconTone(type: DashboardRecentActivity["type"]) {
   switch (type) {
-    case 'CONTRACT':
-      return 'rgba(100,116,139,0.12)';
-    case 'JOURNAL':
-      return 'rgba(147,51,234,0.12)';
-    case 'SUPPORT_TICKET':
-      return 'rgba(249,115,22,0.12)';
-    case 'COVER':
-      return 'rgba(37,99,235,0.12)';
+    case "CONTRACT":
+      return "rgba(100,116,139,0.12)";
+    case "JOURNAL":
+      return "rgba(147,51,234,0.12)";
+    case "SUPPORT_TICKET":
+      return "rgba(249,115,22,0.12)";
+    case "COVER":
+      return "rgba(37,99,235,0.12)";
     default:
-      return 'rgba(0,92,171,0.1)';
+      return "rgba(0,92,171,0.1)";
   }
 }
 
-function activityIconColor(type: DashboardRecentActivity['type']) {
+function activityIconColor(type: DashboardRecentActivity["type"]) {
   switch (type) {
-    case 'CONTRACT':
-      return '#64748B';
-    case 'JOURNAL':
-      return '#7C3AED';
-    case 'SUPPORT_TICKET':
-      return '#EA580C';
-    case 'COVER':
-      return '#2563EB';
+    case "CONTRACT":
+      return "#64748B";
+    case "JOURNAL":
+      return "#7C3AED";
+    case "SUPPORT_TICKET":
+      return "#EA580C";
+    case "COVER":
+      return "#2563EB";
     default:
       return palette.primary;
   }
@@ -521,45 +654,52 @@ const emptySizeStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   actionCopy: { flex: 1, gap: 2 },
   actionIconWrap: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(186,26,26,0.1)',
+    alignItems: "center",
+    backgroundColor: "rgba(186,26,26,0.1)",
     borderRadius: radius.pill,
     height: 32,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 32,
   },
   actionList: { gap: spacing.sm },
   actionRow: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.72)',
-    borderColor: 'rgba(255,211,211,0.65)',
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderColor: "rgba(255,211,211,0.65)",
     borderRadius: radius.md,
     borderWidth: 1,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
     padding: spacing.sm,
   },
-  actionSubtitle: { color: palette.onSurfaceVariant, fontSize: typography.bodySmall },
-  actionTitle: { color: palette.onSurface, fontSize: typography.bodySmall, fontWeight: '700' },
+  actionSubtitle: {
+    color: palette.onSurfaceVariant,
+    fontSize: typography.bodySmall,
+  },
+  actionTitle: {
+    color: palette.onSurface,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+  },
   activityCopy: { flex: 1, gap: 2 },
   activityIconWrap: {
-    alignItems: 'center',
+    alignItems: "center",
     borderRadius: 18,
     height: 36,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 36,
   },
   activityRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  activityRowBorder: { borderBottomColor: '#EEF2F7', borderBottomWidth: 1 },
+  activityRowBorder: { borderBottomColor: "#EEF2F7", borderBottomWidth: 1 },
   activitySubtitle: { color: palette.onSurfaceVariant, fontSize: 13 },
   activityTag: {
-    backgroundColor: 'rgba(241,245,249,0.9)',
+    backgroundColor: "rgba(241,245,249,0.9)",
     borderRadius: radius.pill,
     maxWidth: 112,
     paddingHorizontal: 10,
@@ -567,34 +707,67 @@ const styles = StyleSheet.create({
   },
   activityTagText: {
     fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    textTransform: "uppercase",
   },
-  activityTitle: { color: palette.onSurface, fontSize: typography.body, fontWeight: '600' },
-  activityTrail: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+  activityTitle: {
+    color: palette.onSurface,
+    fontSize: typography.body,
+    fontWeight: "600",
+  },
+  activityTrail: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
   analyticsCard: {
     backgroundColor: palette.surfaceContainerLowest,
     borderRadius: 22,
     gap: spacing.sm,
     minHeight: 214,
     padding: spacing.sm + 2,
-    shadowColor: '#001B3A',
+    shadowColor: "#001B3A",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 18,
   },
-  breakdownLabel: { color: palette.onSurfaceVariant, flexShrink: 1, fontSize: 13 },
-  breakdownLabelRow: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: spacing.xs },
-  breakdownList: { flex: 1, gap: spacing.sm, justifyContent: 'center' },
-  breakdownRow: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
-  breakdownValue: { color: palette.onSurface, fontSize: typography.bodySmall, fontWeight: '700' },
-  cardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  cardMenuRow: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
-  categoryLegend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  breakdownLabel: {
+    color: palette.onSurfaceVariant,
+    flexShrink: 1,
+    fontSize: 13,
+  },
+  breakdownLabelRow: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  breakdownList: { flex: 1, gap: spacing.sm, justifyContent: "center" },
+  breakdownRow: {
+    flexDirection: "row",
     gap: spacing.sm,
-    justifyContent: 'center',
+    justifyContent: "space-between",
+  },
+  breakdownValue: {
+    color: palette.onSurface,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+  },
+  cardHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  cardMenuRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  categoryLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    justifyContent: "center",
     marginTop: spacing.xs,
   },
   combinedHealthCard: {
@@ -602,23 +775,28 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     gap: spacing.sm,
     padding: spacing.sm + 2,
-    shadowColor: '#001B3A',
+    shadowColor: "#001B3A",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 18,
   },
   combinedSection: {
-    borderColor: 'rgba(0,92,171,0.08)',
+    borderColor: "rgba(0,92,171,0.08)",
     borderRadius: 18,
     borderWidth: 1,
     padding: spacing.sm,
   },
-  completionRow: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  expiringSoonHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
+  completionRow: {
+    alignItems: "center",
+    flexDirection: "row",
     gap: spacing.sm,
-    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
+  expiringSoonHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between",
   },
   expiringSoonHeaderCopy: {
     flex: 1,
@@ -631,17 +809,17 @@ const styles = StyleSheet.create({
     color: palette.onSurface,
     flexShrink: 0,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     paddingTop: 2,
-    textAlign: 'right',
+    textAlign: "right",
   },
   emptyAnalytics: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(246,249,255,0.96)',
-    borderColor: 'rgba(0,92,171,0.08)',
+    alignItems: "center",
+    backgroundColor: "rgba(246,249,255,0.96)",
+    borderColor: "rgba(0,92,171,0.08)",
     borderRadius: 18,
     borderWidth: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
@@ -650,31 +828,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginTop: spacing.xs,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptyAnalyticsTitle: {
     color: palette.onSurface,
     fontSize: typography.bodySmall,
-    fontWeight: '700',
+    fontWeight: "700",
     marginTop: spacing.sm,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptyIconWrap: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,92,171,0.08)',
+    alignItems: "center",
+    backgroundColor: "rgba(0,92,171,0.08)",
     borderRadius: 16,
     height: 40,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 40,
   },
   featureBadgeRow: {
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
     marginTop: spacing.sm,
   },
   featureBodyCopy: { flex: 1, gap: 2 },
   featureBodyRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
@@ -682,210 +860,283 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   featureIconWrap: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,92,171,0.08)',
+    alignItems: "center",
+    backgroundColor: "rgba(0,92,171,0.08)",
     borderRadius: 22,
     height: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 48,
   },
   featureMetaHint: { color: palette.onSurfaceVariant, fontSize: 11 },
   featureMetaLabel: { color: palette.onSurfaceVariant, fontSize: 13 },
-  featureMetaValue: { color: palette.onSurface, fontSize: 17, fontWeight: '700' },
-  featureTitle: { color: palette.onSurface, fontSize: 16, fontWeight: '700' },
+  featureMetaValue: {
+    color: palette.onSurface,
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  featureTitle: { color: palette.onSurface, fontSize: 16, fontWeight: "700" },
   legendDot: { borderRadius: 99, height: 10, width: 10 },
-  legendItem: { alignItems: 'center', flexDirection: 'row', gap: spacing.xs, maxWidth: '48%' },
-  legendLabel: { color: palette.onSurfaceVariant, flexShrink: 1, fontSize: 11, fontWeight: '600' },
-  performanceActions: { alignItems: 'center', flexDirection: 'row', flexShrink: 0, justifyContent: 'flex-end' },
-  performanceFooter: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  performanceHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: spacing.sm, justifyContent: 'space-between' },
-  performanceHeading: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: spacing.sm },
+  legendItem: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: spacing.xs,
+    maxWidth: "48%",
+  },
+  legendLabel: {
+    color: palette.onSurfaceVariant,
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  performanceActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    justifyContent: "flex-end",
+  },
+  performanceFooter: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  performanceHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: spacing.sm,
+    justifyContent: "space-between",
+  },
+  performanceHeading: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
   performanceHeadingCopy: { flex: 1, minWidth: 0 },
   performanceIconWrap: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(37,99,235,0.08)',
+    alignItems: "center",
+    backgroundColor: "rgba(37,99,235,0.08)",
     borderRadius: 16,
     height: 38,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 38,
   },
   performancePill: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(248,250,252,1)',
-    borderColor: '#D8E1EE',
+    alignItems: "center",
+    backgroundColor: "rgba(248,250,252,1)",
+    borderColor: "#D8E1EE",
     borderRadius: radius.pill,
     borderWidth: 1,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 2,
     maxWidth: 128,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  performancePillText: { color: palette.onSurface, flexShrink: 1, fontSize: 13, fontWeight: '600' },
-  performanceTotal: { color: palette.primary, fontSize: typography.body, fontWeight: '700' },
+  performancePillText: {
+    color: palette.onSurface,
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  performanceTotal: {
+    color: palette.primary,
+    fontSize: typography.body,
+    fontWeight: "700",
+  },
   planPill: {
-    backgroundColor: 'rgba(59,130,246,0.1)',
+    backgroundColor: "rgba(59,130,246,0.1)",
     borderRadius: radius.pill,
     maxWidth: 110,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  planPillText: { color: '#2563EB', fontSize: 11, fontWeight: '700' },
+  planPillText: { color: "#2563EB", fontSize: 11, fontWeight: "700" },
   progressFill: {
     backgroundColor: palette.primaryContainer,
     borderRadius: radius.pill,
-    height: '100%',
+    height: "100%",
   },
   progressRow: { gap: spacing.xs, marginTop: spacing.sm },
-  progressText: { color: palette.primary, fontSize: 13, fontWeight: '600' },
+  progressText: { color: palette.primary, fontSize: 13, fontWeight: "600" },
   progressTrack: {
-    backgroundColor: '#DCE3EC',
+    backgroundColor: "#DCE3EC",
     borderRadius: radius.pill,
     height: 6,
-    overflow: 'hidden',
-    width: '100%',
+    overflow: "hidden",
+    width: "100%",
   },
   recentCard: {
     backgroundColor: palette.surfaceContainerLowest,
     borderRadius: 22,
-    overflow: 'hidden',
-    shadowColor: '#001B3A',
+    overflow: "hidden",
+    shadowColor: "#001B3A",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 18,
   },
   recentHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: spacing.sm,
   },
-  recentHeaderTitle: { color: palette.white, fontSize: 18, fontWeight: '700' },
+  recentHeaderTitle: { color: palette.white, fontSize: 18, fontWeight: "700" },
   sectionCard: {
     backgroundColor: palette.surfaceContainerLowest,
     borderRadius: 22,
     gap: spacing.sm,
     padding: spacing.sm + 2,
-    shadowColor: '#001B3A',
+    shadowColor: "#001B3A",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 18,
   },
   sectionCardBody: { color: palette.onSurfaceVariant, fontSize: 13 },
   sectionCardHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
-  sectionCardTitle: { color: palette.onSurface, fontSize: 16, fontWeight: '700' },
+  sectionCardTitle: {
+    color: palette.onSurface,
+    fontSize: 16,
+    fontWeight: "700",
+  },
   statusBadge: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(22,163,74,0.1)',
+    alignItems: "center",
+    backgroundColor: "rgba(22,163,74,0.1)",
     borderRadius: radius.pill,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  statusBadgeText: { color: '#16A34A', fontSize: 13, fontWeight: '700', textTransform: 'capitalize' },
+  statusBadgeText: {
+    color: "#16A34A",
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "capitalize",
+  },
   successPill: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(22,163,74,0.1)',
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(22,163,74,0.1)",
     borderRadius: radius.pill,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 6,
     marginTop: spacing.xs,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  successPillText: { color: '#16A34A', fontSize: 13, fontWeight: '700' },
+  successPillText: { color: "#16A34A", fontSize: 13, fontWeight: "700" },
   summaryCard: {
     backgroundColor: palette.surfaceContainerLowest,
     borderRadius: 20,
     minHeight: 142,
     padding: spacing.sm + 2,
-    shadowColor: '#001B3A',
+    shadowColor: "#001B3A",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.1,
     shadowRadius: 14,
   },
   summaryIconWrap: {
-    alignItems: 'center',
+    alignItems: "center",
     borderRadius: 14,
     height: 38,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 38,
   },
   summaryMetricRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: spacing.xs,
   },
-  summarySubtitle: { color: palette.onSurfaceVariant, fontSize: 13, marginTop: 2 },
-  summaryTitle: { color: palette.onSurface, fontSize: 15, fontWeight: '600', marginTop: spacing.xs },
+  summarySubtitle: {
+    color: palette.onSurfaceVariant,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  summaryTitle: {
+    color: palette.onSurface,
+    fontSize: 15,
+    fontWeight: "600",
+    marginTop: spacing.xs,
+  },
   summaryTrendRow: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    alignItems: "center",
+    alignSelf: "flex-start",
     borderRadius: radius.pill,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 4,
     marginTop: spacing.sm,
-    maxWidth: '100%',
+    maxWidth: "100%",
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
-  summaryTrendText: { flexShrink: 1, fontSize: 10, fontWeight: '700' },
-  summaryValue: { color: palette.onSurface, fontSize: 24, fontWeight: '700' },
+  summaryTrendText: { flexShrink: 1, fontSize: 10, fontWeight: "700" },
+  summaryValue: { color: palette.onSurface, fontSize: 24, fontWeight: "700" },
   supportCopy: { flex: 1, gap: 2 },
   supportHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
   supportIconWrap: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(22,163,74,0.12)',
+    alignItems: "center",
+    backgroundColor: "rgba(22,163,74,0.12)",
     borderRadius: 22,
     height: 48,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: 48,
   },
   supportPill: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(22,163,74,0.1)',
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(22,163,74,0.1)",
     borderRadius: radius.pill,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 6,
     marginTop: spacing.sm,
-    maxWidth: '100%',
+    maxWidth: "100%",
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  supportPillText: { color: '#15803D', flexShrink: 1, fontSize: 13, fontWeight: '700' },
-  supportStatus: { color: '#16A34A', fontSize: 16, fontWeight: '700' },
-  supportTime: { color: palette.onSurface, fontSize: 16, fontWeight: '700' },
+  supportPillText: {
+    color: "#15803D",
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  supportStatus: { color: "#16A34A", fontSize: 16, fontWeight: "700" },
+  supportTime: { color: palette.onSurface, fontSize: 16, fontWeight: "700" },
   tileSubtitle: { color: palette.onSurfaceVariant, fontSize: 13 },
-  tileTitle: { color: palette.onSurface, fontSize: 16, fontWeight: '700' },
+  tileTitle: { color: palette.onSurface, fontSize: 16, fontWeight: "700" },
   viewAllPill: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: "rgba(255,255,255,0.12)",
     borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 7,
   },
-  viewAllText: { color: palette.white, fontSize: typography.bodySmall, fontWeight: '700' },
+  viewAllText: {
+    color: palette.white,
+    fontSize: typography.bodySmall,
+    fontWeight: "700",
+  },
   warningCard: {
-    backgroundColor: 'rgba(255,248,248,0.98)',
-    borderColor: 'rgba(186,26,26,0.15)',
+    backgroundColor: "rgba(255,248,248,0.98)",
+    borderColor: "rgba(186,26,26,0.15)",
   },
   warningPill: {
-    backgroundColor: 'rgba(186,26,26,0.12)',
+    backgroundColor: "rgba(186,26,26,0.12)",
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
   },
-  warningPillText: { color: palette.error, fontSize: typography.label, fontWeight: '800' },
+  warningPillText: {
+    color: palette.error,
+    fontSize: typography.label,
+    fontWeight: "800",
+  },
 });
