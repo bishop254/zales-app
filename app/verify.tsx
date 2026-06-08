@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppMessageModal } from '@/components/app/app-message-modal';
@@ -37,8 +37,14 @@ export default function VerifyScreen() {
     visible: false,
   });
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const { width } = useWindowDimensions();
 
   const otpValue = useMemo(() => otp.join(''), [otp]);
+  const otpCellSize = useMemo(() => {
+    const availableWidth = Math.min(width - spacing.xl * 2, 360);
+    const totalGap = spacing.xs * (otp.length - 1);
+    return Math.max(36, Math.min(46, Math.floor((availableWidth - totalGap) / otp.length)));
+  }, [otp.length, width]);
 
   useEffect(() => {
     if (resendCountdown <= 0) {
@@ -174,7 +180,7 @@ export default function VerifyScreen() {
                 maxLength={1}
                 placeholder="."
                 placeholderTextColor={palette.onSurfaceVariant}
-                style={styles.otpCell}
+                style={[styles.otpCell, { width: otpCellSize, height: otpCellSize + 14 }]}
                 textAlign="center"
                 value={digit}
                 onChangeText={(nextValue) => {
@@ -261,9 +267,12 @@ const styles = StyleSheet.create({
     width: 46,
   },
   otpRow: {
+    alignSelf: 'center',
     flexDirection: 'row',
     gap: spacing.xs,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    maxWidth: '100%',
+    width: '100%',
   },
   resendButtonText: {
     color: palette.primary,
@@ -276,6 +285,7 @@ const styles = StyleSheet.create({
   resendRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     gap: spacing.xs,
     marginTop: spacing.md,
@@ -283,5 +293,6 @@ const styles = StyleSheet.create({
   resendText: {
     color: palette.onSurfaceVariant,
     fontSize: typography.bodySmall,
+    textAlign: 'center',
   },
 });

@@ -1,6 +1,5 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { router, type Href } from 'expo-router';
 import { useEffect, useRef, type PropsWithChildren } from 'react';
 import { Platform } from 'react-native';
@@ -12,19 +11,48 @@ import {
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/providers/toast-provider';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
 
 type RegisteredToken = {
   accessToken: string;
   expoPushToken: string;
 };
+
+let notificationsModulePromise: Promise<NotificationsModule> | null = null;
+let notificationHandlerConfigured = false;
+
+function isExpoGo() {
+  return (
+    Constants.appOwnership === 'expo' ||
+    Constants.executionEnvironment === 'storeClient'
+  );
+}
+
+function supportsRemotePushNotifications() {
+  return !(Platform.OS === 'android' && isExpoGo());
+}
+
+async function getNotificationsModule() {
+  if (!notificationsModulePromise) {
+    notificationsModulePromise = import('expo-notifications');
+  }
+
+  const notifications = await notificationsModulePromise;
+
+  if (!notificationHandlerConfigured) {
+    notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+    notificationHandlerConfigured = true;
+  }
+
+  return notifications;
+}
 
 export function PushNotificationsProvider({ children }: PropsWithChildren) {
   const { session } = useAuth();
@@ -34,20 +62,32 @@ export function PushNotificationsProvider({ children }: PropsWithChildren) {
   const permissionToastShownRef = useRef(false);
 
   useEffect(() => {
-    const notificationResponseSubscription =
-      Notifications.addNotificationResponseReceivedListener((response) => {
+    if (!supportsRemotePushNotifications()) {
+      return;
+    }
+
+    let subscription: { remove: () => void } | null = null;
+    let cancelled = false;
+
+    void (async () => {
+      const notifications = await getNotificationsModule();
+      if (cancelled) {
+        return;
+      }
+
+      subscription = notifications.addNotificationResponseReceivedListener((response) => {
         void routeFromNotificationData(response.notification.request.content.data);
       });
 
-    void (async () => {
-      const lastResponse = await Notifications.getLastNotificationResponseAsync();
+      const lastResponse = await notifications.getLastNotificationResponseAsync();
       if (lastResponse) {
-        await routeFromNotificationData(lastResponse.notification.request.content.data);
+        await routeFromNotificationData(lastResponse.notification.request.content.data, notifications);
       }
     })();
 
     return () => {
-      notificationResponseSubscription.remove();
+      cancelled = true;
+      subscription?.remove();
     };
   }, []);
 
@@ -77,22 +117,28 @@ export function PushNotificationsProvider({ children }: PropsWithChildren) {
     const accessToken = session.accessToken;
 
     async function syncPushToken() {
+      if (!supportsRemotePushNotifications()) {
+        return;
+      }
+
       if (!Device.isDevice) {
         return;
       }
 
+      const notifications = await getNotificationsModule();
+
       if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
+        await notifications.setNotificationChannelAsync('default', {
           name: 'Default',
-          importance: Notifications.AndroidImportance.HIGH,
+          importance: notifications.AndroidImportance.HIGH,
         });
       }
 
-      const currentPermissions = await Notifications.getPermissionsAsync();
+      const currentPermissions = await notifications.getPermissionsAsync();
       let permissionGranted = allowsNotifications(currentPermissions);
 
       if (!permissionGranted) {
-        const requestedPermissions = await Notifications.requestPermissionsAsync();
+        const requestedPermissions = await notifications.requestPermissionsAsync();
         permissionGranted = allowsNotifications(requestedPermissions);
       }
 
@@ -116,7 +162,7 @@ export function PushNotificationsProvider({ children }: PropsWithChildren) {
       }
 
       const expoPushToken = (
-        await Notifications.getExpoPushTokenAsync({
+        await notifications.getExpoPushTokenAsync({
           projectId,
         })
       ).data;
@@ -156,14 +202,18 @@ export function PushNotificationsProvider({ children }: PropsWithChildren) {
   return children;
 }
 
-async function routeFromNotificationData(data: unknown) {
+async function routeFromNotificationData(
+  data: unknown,
+  notifications?: NotificationsModule
+) {
   const route = getRouteFromNotificationData(data);
   if (!route) {
     return;
   }
 
   router.push(route);
-  await Notifications.clearLastNotificationResponseAsync();
+  const loadedNotifications = notifications ?? (supportsRemotePushNotifications() ? await getNotificationsModule() : null);
+  await loadedNotifications?.clearLastNotificationResponseAsync();
 }
 
 function getRouteFromNotificationData(data: unknown): Href | null {
@@ -176,17 +226,17 @@ function getRouteFromNotificationData(data: unknown): Href | null {
 }
 
 function allowsNotifications(
-  permissions: Notifications.NotificationPermissionsStatus
+  permissions: Awaited<ReturnType<NotificationsModule['getPermissionsAsync']>>
 ): boolean {
   const normalized = permissions as {
-    ios?: { status?: Notifications.IosAuthorizationStatus };
+    ios?: { status?: NotificationsModule['IosAuthorizationStatus'][keyof NotificationsModule['IosAuthorizationStatus']] };
     status?: string;
   };
 
   return (
     normalized.status === 'granted' ||
-    normalized.ios?.status === Notifications.IosAuthorizationStatus.AUTHORIZED ||
-    normalized.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+    normalized.ios?.status === 2 ||
+    normalized.ios?.status === 3
   );
 }
 
