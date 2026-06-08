@@ -13,15 +13,8 @@ function authHeaders(accessToken: string) {
   };
 }
 
-function logDashboardAnalyticsCurl(url: string, accessToken: string) {
-  console.log(
-    `[Analytics API] curl --request GET "${url}" --header "Accept: application/json" --header "Authorization: Bearer ${accessToken}"`,
-  );
-}
-
 export async function getDashboardAnalytics(accessToken: string): Promise<DashboardAnalyticsResponse> {
   const url = `${apiConfig.baseUrl}/analytics/dashboard`;
-  logDashboardAnalyticsCurl(url, accessToken);
   const response = await fetch(url, {
     headers: authHeaders(accessToken),
   });
@@ -31,7 +24,6 @@ export async function getDashboardAnalytics(accessToken: string): Promise<Dashbo
 
 export async function getAdminDashboardAnalytics(accessToken: string): Promise<AdminDashboardAnalyticsResponse> {
   const url = `${apiConfig.baseUrl}/admin/analytics/dashboard`;
-  logDashboardAnalyticsCurl(url, accessToken);
   const response = await fetch(url, {
     headers: authHeaders(accessToken),
   });
@@ -44,7 +36,6 @@ export async function getAdminUserDashboardAnalytics(
   userId: string,
 ): Promise<DashboardAnalyticsResponse> {
   const url = `${apiConfig.baseUrl}/admin/analytics/users/${userId}/dashboard`;
-  logDashboardAnalyticsCurl(url, accessToken);
   const response = await fetch(url, {
     headers: authHeaders(accessToken),
   });
