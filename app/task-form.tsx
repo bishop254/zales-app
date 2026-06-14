@@ -1,10 +1,9 @@
-import { MaterialIcons } from '@expo/vector-icons';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { DatePickerModal } from '@/components/app/date-picker-modal';
 import { AppMessageModal } from '@/components/app/app-message-modal';
-import { AppModal } from '@/components/app/app-modal';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { AuthPressableField, AuthSearchSelectField, AuthSelectField, AuthTextField } from '@/components/auth/auth-primitives';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
@@ -162,13 +161,6 @@ const TIMEZONE_OPTIONS = [
 
 const CALENDAR_COLUMN_WIDTH = `${100 / 7}%` as const;
 
-function formatDateIso(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function formatReadableDate(dateValue: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue.trim())) {
     return dateValue;
@@ -188,28 +180,6 @@ function formatReadableDate(dateValue: string) {
 
 function isIsoDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
-}
-
-function buildCalendarDays(monthDate: Date) {
-  const year = monthDate.getFullYear();
-  const month = monthDate.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (Date | null)[] = [];
-
-  for (let index = 0; index < firstDay; index += 1) {
-    cells.push(null);
-  }
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    cells.push(new Date(year, month, day));
-  }
-
-  while (cells.length % 7 !== 0) {
-    cells.push(null);
-  }
-
-  return cells;
 }
 
 function countWords(value: string) {
@@ -788,88 +758,36 @@ export default function TaskFormScreen() {
         </View>
       </FloatingPageShell>
 
-      <AppModal
-        footer={
-          <View style={styles.modalFooter}>
-            <Pressable style={[styles.modalButton, styles.modalButtonOutline]} onPress={() => setDatePickerOpen(false)}>
-              <Text style={[styles.modalButtonText, styles.modalButtonTextOutline]}>Cancel</Text>
-            </Pressable>
-          </View>
-        }
-        frameStyle={styles.dateModalFrame}
+      <DatePickerModal
         title="Select date"
+        month={pickerMonth}
+        selectedDate={activeDateField ? form[activeDateField] : null}
         visible={datePickerOpen}
-        onClose={() => setDatePickerOpen(false)}>
-        <View style={styles.calendarHeader}>
-          <Pressable
-            style={styles.calendarNavButton}
-            onPress={() => setPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
-            <MaterialIcons color={palette.primary} name="chevron-left" size={22} />
-          </Pressable>
-          <Text style={styles.calendarTitle}>
-            {pickerMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
-          </Text>
-          <Pressable
-            style={styles.calendarNavButton}
-            onPress={() => setPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>
-            <MaterialIcons color={palette.primary} name="chevron-right" size={22} />
-          </Pressable>
-        </View>
+        onClose={() => setDatePickerOpen(false)}
+        onMonthChange={setPickerMonth}
+        onSelectDate={(dateIso) => {
+          if (!activeDateField) {
+            return;
+          }
 
-        <View style={styles.calendarWeekdays}>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <Text key={day} style={styles.calendarWeekday}>
-              {day}
-            </Text>
-          ))}
-        </View>
+          updateForm(activeDateField, dateIso);
+          setDatePickerOpen(false);
+        }}
+        getDateState={(_, dateIso) => {
+          const dateState = activeDateField
+            ? getCalendarDateState({
+                dateIso,
+                field: activeDateField,
+                form,
+              })
+            : { disabled: true, past: false };
 
-        <View style={styles.calendarGrid}>
-          {buildCalendarDays(pickerMonth).map((day, index) => {
-            const iso = day ? formatDateIso(day) : null;
-            const selected = activeDateField && iso === form[activeDateField];
-            const dateState =
-              day && iso
-                ? getCalendarDateState({
-                    dateIso: iso,
-                    field: activeDateField,
-                    form,
-                  })
-                : { disabled: true, past: false };
-            const isDisabled = !day || dateState.disabled;
-
-            return (
-              <Pressable
-                key={iso ?? `empty-${index}`}
-                disabled={isDisabled}
-                style={[
-                  styles.calendarDay,
-                  !day ? styles.calendarDayEmpty : null,
-                  dateState.past ? styles.calendarDayPast : null,
-                  selected ? styles.calendarDaySelected : null,
-                ]}
-                onPress={() => {
-                  if (!activeDateField || !day) {
-                    return;
-                  }
-
-                  updateForm(activeDateField, formatDateIso(day));
-                  setDatePickerOpen(false);
-                }}>
-                <Text
-                  style={[
-                    styles.calendarDayText,
-                    !day ? styles.calendarDayTextEmpty : null,
-                    dateState.past ? styles.calendarDayTextPast : null,
-                    selected ? styles.calendarDayTextSelected : null,
-                  ]}>
-                  {day ? day.getDate() : 0}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </AppModal>
+          return {
+            disabled: dateState.disabled,
+            muted: dateState.past,
+          };
+        }}
+      />
 
       <AppMessageModal
         eyebrow={infoModal.eyebrow}

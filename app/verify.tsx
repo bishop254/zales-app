@@ -255,15 +255,20 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     color: palette.onSurface,
+    flex: 1,
     fontSize: typography.headline,
     fontWeight: '600',
     height: 60,
-    width: 46,
+    maxWidth: 46,
+    minWidth: 0,
   },
   otpRow: {
+    alignSelf: 'center',
     flexDirection: 'row',
     gap: spacing.xs,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    maxWidth: '100%',
+    width: '100%',
   },
   resendButtonText: {
     color: palette.primary,
@@ -276,6 +281,7 @@ const styles = StyleSheet.create({
   resendRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     gap: spacing.xs,
     marginTop: spacing.md,
@@ -283,5 +289,6 @@ const styles = StyleSheet.create({
   resendText: {
     color: palette.onSurfaceVariant,
     fontSize: typography.bodySmall,
+    textAlign: 'center',
   },
 });

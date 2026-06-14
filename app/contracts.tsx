@@ -89,6 +89,7 @@ type ActionMenuPosition = {
 };
 
 const ACTION_MENU_HEIGHT = 188;
+const CONTRACT_EXPIRY_NOTICE_DAYS = 45;
 
 function formatLongDate(dateValue: string | null) {
   if (!dateValue) {
@@ -220,7 +221,7 @@ function getContractStatus(contract: ContractRecord): ContractStatus {
     return 'UPCOMING';
   }
 
-  return expiryDelta <= 14 ? 'EXPIRING' : 'ACTIVE';
+  return expiryDelta <= CONTRACT_EXPIRY_NOTICE_DAYS ? 'EXPIRING' : 'ACTIVE';
 }
 
 function mapContractToListItem(contract: ContractRecord): ContractListItem {
@@ -445,7 +446,7 @@ export default function ContractsScreen() {
       [...contracts]
         .filter((contract) => {
           const days = daysUntil(contract.contractExpiryDate);
-          return days >= 0 && days <= 14;
+          return days >= 0 && days <= CONTRACT_EXPIRY_NOTICE_DAYS;
         })
         .sort((left, right) => daysUntil(left.contractExpiryDate) - daysUntil(right.contractExpiryDate))
         .map((contract) => buildContractNotificationItem(contract, contract.contractExpiryDate)),
@@ -1029,7 +1030,7 @@ export default function ContractsScreen() {
           ) : (
             <View style={styles.notificationEmpty}>
               <Text style={styles.notificationEmptyText}>
-                No expiring contracts right now. You are up to date.
+                No contracts expiring in the next 45 days. You are up to date.
               </Text>
             </View>
           )}

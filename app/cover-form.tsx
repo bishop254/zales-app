@@ -1,10 +1,9 @@
-import { MaterialIcons } from '@expo/vector-icons';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { DatePickerModal } from '@/components/app/date-picker-modal';
 import { AppMessageModal } from '@/components/app/app-message-modal';
-import { AppModal } from '@/components/app/app-modal';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { AuthPressableField, AuthSearchSelectField, AuthSelectField, AuthTextField } from '@/components/auth/auth-primitives';
 import { africanCountries } from '@/constants/african-countries';
@@ -74,13 +73,6 @@ const INITIAL_TOUCHED: CoverTouched = {
   insuranceProvider: false,
 };
 
-function formatDateIso(date: Date) {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function formatReadableDate(dateValue: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue.trim())) {
     return dateValue;
@@ -96,28 +88,6 @@ function formatReadableDate(dateValue: string) {
     month: 'long',
     year: 'numeric',
   });
-}
-
-function buildCalendarDays(monthDate: Date) {
-  const year = monthDate.getFullYear();
-  const month = monthDate.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (Date | null)[] = [];
-
-  for (let index = 0; index < firstDay; index += 1) {
-    cells.push(null);
-  }
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    cells.push(new Date(year, month, day));
-  }
-
-  while (cells.length % 7 !== 0) {
-    cells.push(null);
-  }
-
-  return cells;
 }
 
 function validateCreateForm(form: CoverForm) {
@@ -594,80 +564,29 @@ export default function CoverFormScreen() {
         </View>
       </FloatingPageShell>
 
-      <AppModal
-        footer={
-          <View style={styles.modalFooter}>
-            <Pressable style={[styles.modalButton, styles.modalButtonOutline]} onPress={() => setDatePickerOpen(false)}>
-              <Text style={[styles.modalButtonText, styles.modalButtonTextOutline]}>Cancel</Text>
-            </Pressable>
-          </View>
-        }
-        frameStyle={styles.dateModalFrame}
+      <DatePickerModal
         title="Select expiry date"
+        month={pickerMonth}
+        selectedDate={form.expiryDate}
         visible={datePickerOpen}
-        onClose={() => setDatePickerOpen(false)}>
-        <View style={styles.calendarHeader}>
-          <Pressable
-            style={styles.calendarNavButton}
-            onPress={() => setPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>
-            <MaterialIcons color={palette.primary} name="chevron-left" size={22} />
-          </Pressable>
-          <Text style={styles.calendarTitle}>
-            {pickerMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
-          </Text>
-          <Pressable
-            style={styles.calendarNavButton}
-            onPress={() => setPickerMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>
-            <MaterialIcons color={palette.primary} name="chevron-right" size={22} />
-          </Pressable>
-        </View>
+        onClose={() => setDatePickerOpen(false)}
+        onMonthChange={setPickerMonth}
+        onSelectDate={(dateIso) => {
+          updateForm('expiryDate', dateIso);
+          setDatePickerOpen(false);
+        }}
+        getDateState={(day) => {
+          const tomorrow = new Date();
+          tomorrow.setHours(0, 0, 0, 0);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const isPast = day < tomorrow;
 
-        <View style={styles.calendarWeekdays}>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <Text key={day} style={styles.calendarWeekday}>
-              {day}
-            </Text>
-          ))}
-        </View>
-
-        <View style={styles.calendarGrid}>
-          {buildCalendarDays(pickerMonth).map((day, index) => {
-            const iso = day ? formatDateIso(day) : null;
-            const selected = iso === form.expiryDate;
-            const tomorrow = new Date();
-            tomorrow.setHours(0, 0, 0, 0);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const isPast = day ? day < tomorrow : false;
-            const isDisabled = !day || isPast;
-
-            return (
-              <Pressable
-                key={iso ?? `empty-${index}`}
-                disabled={isDisabled}
-                style={[
-                  styles.calendarDay,
-                  !day ? styles.calendarDayEmpty : null,
-                  isPast ? styles.calendarDayPast : null,
-                  selected ? styles.calendarDaySelected : null,
-                ]}
-                onPress={() => {
-                  updateForm('expiryDate', formatDateIso(day!));
-                  setDatePickerOpen(false);
-                }}>
-                <Text
-                  style={[
-                    styles.calendarDayText,
-                    !day ? styles.calendarDayTextEmpty : null,
-                    isPast ? styles.calendarDayTextPast : null,
-                    selected ? styles.calendarDayTextSelected : null,
-                  ]}>
-                  {day ? day.getDate() : 0}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </AppModal>
+          return {
+            disabled: isPast,
+            muted: isPast,
+          };
+        }}
+      />
 
       <AppMessageModal
         eyebrow={infoModal.eyebrow}

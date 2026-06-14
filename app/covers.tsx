@@ -78,7 +78,8 @@ type ActionMenuPosition = {
 
 const ACTION_MENU_HEIGHT = 208;
 
-const EXPIRY_NOTICE_DAYS = 14;
+// Keep the expiry UI aligned with the backend reminder window.
+const EXPIRY_NOTICE_DAYS = 30;
 const MONTHLY_DUE_NOTICE_DAYS = 5;
 
 function formatLongDate(dateValue: string | null) {
@@ -128,7 +129,7 @@ function getCoverStatus(cover: CoverRecord): CoverStatus {
     return 'LAPSED';
   }
 
-  return daysToExpiry <= 7 ? 'DUE' : 'ACTIVE';
+  return daysToExpiry <= EXPIRY_NOTICE_DAYS ? 'DUE' : 'ACTIVE';
 }
 
 function mapCoverToListItem(cover: CoverRecord): CoverListItem {
@@ -1057,7 +1058,7 @@ export default function CoversScreen() {
             </View>
           ) : (
             <View style={styles.notificationEmpty}>
-              <Text style={styles.notificationEmptyText}>No covers expiring in the next 14 days.</Text>
+              <Text style={styles.notificationEmptyText}>No covers expiring in the next 30 days.</Text>
             </View>
           )}
         </View>

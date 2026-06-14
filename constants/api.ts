@@ -2,8 +2,8 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 function getDefaultBaseUrl() {
-  const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-  // const configuredBaseUrl = 'https://mig-burs.com/zales/';
+  // const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+  const configuredBaseUrl = 'https://mig-burs.com/zales/';
 
   if (configuredBaseUrl) {
     return configuredBaseUrl;
