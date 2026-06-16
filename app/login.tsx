@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { AuthBackground, AuthButton, AuthCard, AuthTextField } from '@/components/auth/auth-primitives';
-import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { palette, spacing, typography } from '@/constants/app-theme';
 import { validateEmail, validatePassword } from '@/features/auth/validation';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/providers/toast-provider';
@@ -20,13 +20,14 @@ type FeedbackModalState = {
 };
 
 export default function LoginScreen() {
-  const { login, loginWithGoogle } = useAuth();
+  const { forgotPassword, login, loginWithGoogle } = useAuth();
   const { showToast } = useToast();
   const { registered } = useLocalSearchParams<{ registered?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [recoverSubmitting, setRecoverSubmitting] = useState(false);
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalState>({
     eyebrow: '',
     message: '',
@@ -45,6 +46,7 @@ export default function LoginScreen() {
   );
 
   const canSubmit = !errors.email && !errors.password;
+  const canRecoverPassword = !errors.email && !!email.trim();
 
   useEffect(() => {
     if (registered === '1' && !hasHandledRegistrationToast.current) {
@@ -77,7 +79,7 @@ export default function LoginScreen() {
   }
 
   async function handleSubmit() {
-    if (!canSubmit || submitting) {
+    if (!canSubmit || submitting || recoverSubmitting) {
       return;
     }
 
@@ -108,7 +110,7 @@ export default function LoginScreen() {
   }
 
   async function handleGoogleLogin() {
-    if (googleSubmitting || submitting) {
+    if (googleSubmitting || submitting || recoverSubmitting) {
       return;
     }
 
@@ -128,6 +130,48 @@ export default function LoginScreen() {
       });
     } finally {
       setGoogleSubmitting(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (recoverSubmitting) {
+      return;
+    }
+
+    if (!canRecoverPassword) {
+      openFeedbackModal({
+        eyebrow: 'Email required',
+        message: 'Enter the email address for your account, then try forgot password again.',
+        title: 'Reset your password',
+        tone: 'info',
+      });
+      return;
+    }
+
+    try {
+      closeFeedbackModal();
+      setRecoverSubmitting(true);
+      const response = await forgotPassword(email);
+      showToast(response.message);
+      openFeedbackModal({
+        eyebrow: 'Check your inbox',
+        message:
+          'If your account exists, we have sent a temporary password. Use it to sign in, then set a new password right away.',
+        title: 'Password reset requested',
+        tone: 'info',
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to request a password reset right now.';
+      showToast(message, 'error');
+      openFeedbackModal({
+        eyebrow: 'Reset failed',
+        message,
+        title: 'Password reset unavailable',
+        tone: 'error',
+      });
+    } finally {
+      setRecoverSubmitting(false);
     }
   }
 
@@ -163,26 +207,19 @@ export default function LoginScreen() {
             secureTextEntry
             secureToggle
             value={password}
-            onActionPress={() =>
-              openFeedbackModal({
-                eyebrow: 'Coming soon',
-                message: 'Password recovery is not wired yet.',
-                title: 'Forgot password',
-                tone: 'info',
-              })
-            }
+            onActionPress={() => void handleForgotPassword()}
             onChangeText={setPassword}
           />
 
           <View style={styles.actions}>
             <AuthButton
-              disabled={!canSubmit || submitting}
+              disabled={!canSubmit || submitting || recoverSubmitting}
               loading={submitting}
               title={submitting ? 'Checking account...' : 'Login'}
               onPress={handleSubmit}
             />
             <AuthButton
-              disabled={googleSubmitting || submitting}
+              disabled={googleSubmitting || submitting || recoverSubmitting}
               loading={googleSubmitting}
               title={googleSubmitting ? 'Opening Google...' : 'Continue with Google'}
               variant="secondary"
@@ -235,15 +272,7 @@ export default function LoginScreen() {
         type={feedbackModal.tone}
         onSecondaryAction={
           feedbackModal.tone === 'error'
-            ? () => {
-                closeFeedbackModal();
-                openFeedbackModal({
-                  eyebrow: 'Coming soon',
-                  message: 'Password recovery is not wired yet.',
-                  title: 'Forgot password',
-                  tone: 'info',
-                });
-              }
+            ? () => void handleForgotPassword()
             : undefined
         }
       />

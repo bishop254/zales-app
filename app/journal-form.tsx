@@ -141,20 +141,21 @@ export default function JournalFormScreen() {
   );
 
   useEffect(() => {
-    const accessToken: string | null = session?.accessToken ?? null;
-
-    if (!isEditMode || !journalId || !accessToken) {
+    const accessTokenValue = session?.accessToken;
+    if (!isEditMode || !journalId || !accessTokenValue) {
       setLoadingJournal(false);
       return;
     }
 
+    const accessToken: string = accessTokenValue;
+    const editJournalId: string = journalId;
     let active = true;
 
     async function loadJournal() {
       setLoadingJournal(true);
 
       try {
-        const journal: JournalRecord = await getJournalById(accessToken, journalId);
+        const journal: JournalRecord = await getJournalById(accessToken, editJournalId);
 
         if (!active) {
           return;

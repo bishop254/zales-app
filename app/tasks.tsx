@@ -615,9 +615,6 @@ export default function TasksScreen() {
           <View style={styles.heroHeaderRow}>
             <View style={styles.heroCopy}>
               <Text style={styles.heroTitle}>Task Planner</Text>
-              <Text style={styles.heroBody}>
-                Keep one-off follow-ups and repetitive routines organized.
-              </Text>
             </View>
             <Pressable style={styles.addButton} onPress={handleOpenCreate}>
               <MaterialIcons color={palette.white} name="add" size={18} />

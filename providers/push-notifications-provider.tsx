@@ -29,7 +29,18 @@ function isExpoGo() {
 }
 
 function supportsRemotePushNotifications() {
+  if (Platform.OS === 'web') {
+    return false;
+  }
+
   return !(Platform.OS === 'android' && isExpoGo());
+}
+
+function hasConfiguredAndroidFirebase() {
+  return Boolean(
+    Constants.expoConfig?.android?.googleServicesFile ||
+      Constants.manifest2?.extra?.expoClient?.android?.googleServicesFile
+  );
 }
 
 async function getNotificationsModule() {
@@ -60,6 +71,7 @@ export function PushNotificationsProvider({ children }: PropsWithChildren) {
   const registeredTokenRef = useRef<RegisteredToken | null>(null);
   const previousSessionRef = useRef<typeof session>(null);
   const permissionToastShownRef = useRef(false);
+  const registrationErrorToastShownRef = useRef(false);
 
   useEffect(() => {
     if (!supportsRemotePushNotifications()) {
@@ -118,10 +130,13 @@ export function PushNotificationsProvider({ children }: PropsWithChildren) {
 
     async function syncPushToken() {
       if (!supportsRemotePushNotifications()) {
-        return;
-      }
-
-      if (!Device.isDevice) {
+        if (Platform.OS === 'android' && !registrationErrorToastShownRef.current) {
+          registrationErrorToastShownRef.current = true;
+          showToast(
+            'Android remote push notifications require a development, preview, or production build. Expo Go only supports local notifications.',
+            'error'
+          );
+        }
         return;
       }
 
@@ -191,7 +206,10 @@ export function PushNotificationsProvider({ children }: PropsWithChildren) {
       }
 
       const message = getPushRegistrationErrorMessage(error);
-      showToast(message, 'error');
+      if (!registrationErrorToastShownRef.current) {
+        registrationErrorToastShownRef.current = true;
+        showToast(message, 'error');
+      }
     });
 
     return () => {
@@ -251,7 +269,17 @@ function getPushRegistrationErrorMessage(error: unknown): string {
     Platform.OS === 'android' &&
     error.message.includes('Default FirebaseApp is not initialized')
   ) {
-    return 'Android push notifications are not configured yet. Add google-services.json and rebuild the app.';
+    return hasConfiguredAndroidFirebase()
+      ? 'Android push notifications are configured in the source, but this installed build does not include the latest Firebase setup yet. Rebuild and reinstall the newest Android dev/preview build, then test again.'
+      : 'Android push notifications are not configured in app config yet. Add google-services.json, expose it through app config, and rebuild the app.';
+  }
+
+  if (
+    Platform.OS === 'android' &&
+    (error.message.includes('SERVICE_NOT_AVAILABLE') ||
+      error.message.includes('AUTHENTICATION_FAILED'))
+  ) {
+    return 'Android push registration could not reach Google Play services. Confirm the device or emulator has Google Play services and network access, then try again.';
   }
 
   return error.message || fallback;

@@ -13,6 +13,7 @@ import { palette, radius, spacing, typography } from '@/constants/app-theme';
 import { setUnauthorizedListener } from '@/features/api/auth-session';
 import {
   type AuthResult,
+  forgotPasswordWithBackend,
   type LoginResponse,
   loginWithBackend,
   registerWithBackend,
@@ -64,6 +65,7 @@ type LogoutOptions = {
 };
 
 type AuthContextValue = {
+  forgotPassword: (email: string) => Promise<{ message: string }>;
   login: (credentials: Credentials) => Promise<LoginResponse>;
   loginWithGoogle: () => Promise<void>;
   logout: (options?: LogoutOptions) => void;
@@ -127,6 +129,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const register = useCallback(async (details: Registration) => {
     return registerWithBackend(details);
+  }, []);
+
+  const forgotPassword = useCallback(async (email: string) => {
+    return forgotPasswordWithBackend(email);
   }, []);
 
   const resendOtpChallenge = useCallback(async () => {
@@ -263,6 +269,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo(
     () => ({
+      forgotPassword,
       login,
       loginWithGoogle,
       logout,
@@ -274,6 +281,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       submitOtp,
     }),
     [
+      forgotPassword,
       login,
       loginWithGoogle,
       logout,

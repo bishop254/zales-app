@@ -332,11 +332,6 @@ export default function BillingScreen() {
         {/* ── Hero ────────────────────────────────────────────────────── */}
         <View style={styles.heroSection}>
           <Text style={styles.heroTitle}>Subscription</Text>
-          <Text style={styles.heroBody}>
-            {hasActiveSubscription
-              ? 'Your plan is active. Swipe to explore other plans.'
-              : 'Choose a plan below to unlock all features.'}
-          </Text>
         </View>
 
         {/* ── Subscription status ──────────────────────────────────────── */}

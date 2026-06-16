@@ -134,7 +134,7 @@ export default function DashboardScreen() {
   const cardsLocked = !isAdmin && (subscriptionLoading || !hasActiveSubscription);
   const hasNotification = (analytics?.actionNeeded?.total ?? 0) > 0;
 
-  const summaryCards = useMemo(() => {
+  const summaryCards = useMemo<DashboardAnalyticsResponse['summaryCards']>(() => {
     const baseCards = analytics?.summaryCards ?? [];
     const sortedCards = [...baseCards].sort((left, right) => {
       const leftIndex = SUMMARY_CARD_KEYS.indexOf(left.key);
@@ -180,14 +180,16 @@ export default function DashboardScreen() {
       }
     }
 
-    return [
+    const tabs: NotificationTab[] = [
       { count: notificationItems.length, key: 'all', label: 'All' },
       { count: groupedCounts.tasks, key: 'tasks', label: 'Tasks' },
       { count: groupedCounts.covers, key: 'covers', label: 'Covers' },
       { count: groupedCounts.contracts, key: 'contracts', label: 'Contracts' },
       { count: groupedCounts.support, key: 'support', label: 'Support' },
       { count: groupedCounts.billing, key: 'billing', label: 'Billing' },
-    ].filter((tab) => tab.key === 'all' || tab.count > 0);
+    ];
+
+    return tabs.filter((tab) => tab.key === 'all' || tab.count > 0);
   }, [notificationItems]);
   const visibleNotificationItems = useMemo(
     () =>
@@ -493,11 +495,6 @@ export default function DashboardScreen() {
           showsVerticalScrollIndicator={false}>
           <View style={styles.heroSection}>
             <Text style={styles.welcomeTitle}>{welcomeTitle}</Text>
-            <Text style={styles.heroSubtitle}>
-              {isAdmin
-                ? 'Track platform activity, account health, and the latest movement across the workspace.'
-                : 'Here is the latest view of your pipeline, activity, and what needs attention next.'}
-            </Text>
             {!isAdmin ? <ReferralCodePill code={referralCode} onCopy={handleCopyReferralCode} /> : null}
 
             {isAdmin ? (

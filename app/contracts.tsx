@@ -860,9 +860,6 @@ export default function ContractsScreen() {
           <View style={styles.heroHeaderRow}>
             <View style={styles.heroCopy}>
               <Text style={styles.heroTitle}>Contracts Hub</Text>
-              <Text style={styles.heroBody}>
-                Keep every agreement and key expiry date organised in one polished workspace.
-              </Text>
             </View>
             <Pressable style={styles.addButton} onPress={handleOpenCreate}>
               <MaterialIcons color={palette.white} name="add" size={18} />

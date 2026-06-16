@@ -680,9 +680,6 @@ export default function CoversScreen() {
           <View style={styles.heroHeaderRow}>
             <View style={styles.heroCopy}>
               <Text style={styles.heroTitle}>Covers Overview</Text>
-              <Text style={styles.heroBody}>
-                Track live policies, renewal dates, and new customer covers from the backend.
-              </Text>
             </View>
             <Pressable style={styles.addButton} onPress={handleOpenCreate}>
               <MaterialIcons color={palette.white} name="add" size={18} />

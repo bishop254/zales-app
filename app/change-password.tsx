@@ -41,8 +41,11 @@ export default function ChangePasswordScreen() {
     return <Redirect href="/login" />;
   }
 
+  const accessToken = session.accessToken;
+  const profileImageUrl = session.profileImageUrl;
+
   async function handleSubmit() {
-    if (!session.accessToken || submitting || !canSubmit) {
+    if (!accessToken || submitting || !canSubmit) {
       return;
     }
 
@@ -50,11 +53,10 @@ export default function ChangePasswordScreen() {
     setErrorMessage('');
 
     try {
-      const response = await changeMyPassword(session.accessToken, {
+      const response = await changeMyPassword(accessToken, {
         currentPassword,
         newPassword,
       });
-
       showToast(response.message || 'Password changed successfully.');
       router.replace('/profile');
     } catch (error) {
@@ -77,7 +79,7 @@ export default function ChangePasswordScreen() {
       onBackPress={() => router.back()}
       onNotificationPress={() => showToast('You are all caught up right now.')}
       onProfilePress={() => router.push('/profile')}
-      profileImageUrl={session.profileImageUrl}
+      profileImageUrl={profileImageUrl}
       title="Change Password">
       <View style={styles.heroCard}>
         <View style={styles.heroIconWrap}>

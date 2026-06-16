@@ -34,21 +34,26 @@ Reference:
 ## Current flow
 
 1. `app/index.tsx` is the landing screen.
-2. `app/login.tsx` handles sign-in validation and routes to the dashboard.
-3. `app/register.tsx` handles simple account creation validation and routes to the dashboard.
-4. `app/dashboard.tsx` shows a lightweight authenticated experience.
+2. `app/login.tsx` handles sign-in validation, forgot-password requests, and routes to the backend challenge screens.
+3. `app/register.tsx` handles account creation and redirects users back to login.
+4. `app/set-password.tsx` completes the backend first-login challenge.
+5. `app/verify.tsx` completes OTP verification.
+6. `app/dashboard.tsx` shows a lightweight authenticated experience.
 
 ## Backend login integration
 
-The mobile app now calls the backend login endpoint:
+The mobile app now calls the backend auth endpoints:
 
 - `POST /auth/login`
-- request body:
-  - `email`
-  - `password`
-- success payload:
-  - `data.access_token`
-  - `data.isFirstLogin`
+- `POST /auth/forgot-password`
+- `POST /auth/set-password`
+- `POST /auth/verify-otp`
+
+The login response is challenge-based:
+
+- first-login accounts receive `data.requiresPasswordChange` plus a temporary bearer token for `POST /auth/set-password`
+- returning accounts receive `data.requiresOtp` plus a temporary bearer token for `POST /auth/verify-otp`
+- forgot-password requests return a generic success message and, for matching active accounts, send a temporary password by email
 
 The backend wraps responses in a shared envelope, so the app reads both success and error messages from that shape.
 
@@ -94,7 +99,7 @@ Before production, the next sensible steps are:
 
 1. Store tokens with secure device storage.
 2. Add session refresh and sign-out invalidation.
-3. Implement the backend `change-password` flow for first-login accounts.
+3. Persist challenge/session state securely on device.
 4. Move dashboard data to typed API hooks.
 5. Add tests for auth validation and route behavior.
 
@@ -125,7 +130,7 @@ npm run lint
 
 Good next slices after this starter:
 
-1. forgot password flow
+1. richer account recovery status and inbox deep-linking
 2. persistent authenticated sessions
 3. lead list and lead detail screens
 4. activity timeline

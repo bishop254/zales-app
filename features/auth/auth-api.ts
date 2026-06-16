@@ -37,6 +37,10 @@ export type RegistrationResponse = {
   message: string;
 };
 
+export type ForgotPasswordResponse = {
+  message: string;
+};
+
 export type FirstLoginChallenge = {
   requiresPasswordChange: true;
   token: string;
@@ -84,6 +88,23 @@ export async function registerWithBackend(payload: RegisterPayload): Promise<Reg
   });
 
   return parseApiEnvelope<RegistrationResponse>(response);
+}
+
+export async function forgotPasswordWithBackend(
+  email: string
+): Promise<ForgotPasswordResponse> {
+  const response = await fetch(`${apiConfig.baseUrl}/auth/forgot-password`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email: email.trim().toLowerCase(),
+    }),
+  });
+
+  return parseApiEnvelope<ForgotPasswordResponse>(response);
 }
 
 export async function setFirstPassword(token: string, newPassword: string): Promise<AuthResult> {

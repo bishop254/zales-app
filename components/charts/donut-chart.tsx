@@ -66,12 +66,14 @@ export function SegmentedDonutChart({
 }: SegmentedDonutChartProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const safeSegments = segments.map((segment) => ({
-    ...segment,
-    value: Math.max(0, segment.value),
-  }));
+  const safeSegments = segments
+    .map((segment) => ({
+      ...segment,
+      value: Math.max(0, segment.value),
+    }))
+    .filter((segment) => segment.value > 0);
   const total = safeSegments.reduce((sum, segment) => sum + segment.value, 0);
-  let offset = 0;
+  let cumulativeLength = 0;
 
   return (
     <View style={styles.wrap}>
@@ -87,8 +89,9 @@ export function SegmentedDonutChart({
         {total > 0
           ? safeSegments.map((segment, index) => {
               const dashLength = (segment.value / total) * circumference;
-              const dashOffset = circumference - offset;
-              offset += dashLength;
+              const dashGap = Math.max(circumference - dashLength, 0);
+              const dashOffset = -cumulativeLength;
+              cumulativeLength += dashLength;
 
               return (
                 <Circle
@@ -100,7 +103,7 @@ export function SegmentedDonutChart({
                   rotation="-90"
                   origin={`${size / 2}, ${size / 2}`}
                   stroke={segment.color}
-                  strokeDasharray={`${dashLength} ${circumference}`}
+                  strokeDasharray={`${dashLength} ${dashGap}`}
                   strokeDashoffset={dashOffset}
                   strokeLinecap="butt"
                   strokeWidth={strokeWidth}

@@ -42,15 +42,32 @@ export function SummaryCard({
 }: SummaryCardProps) {
   return (
     <Pressable style={[styles.summaryCard, active ? styles.summaryCardActive : null, style]} onPress={onPress}>
-      <View style={styles.summaryHeader}>
+      <View style={styles.summaryRow}>
         <View style={[styles.summaryIconWrap, iconToneStyles[iconTone]]}>
-          <MaterialIcons color={iconToneColors[iconTone]} name={icon} size={24} />
+          <MaterialIcons color={iconToneColors[iconTone]} name={icon} size={20} />
         </View>
-        <Text style={styles.summaryCount}>{count}</Text>
-      </View>
-      <View style={styles.summaryFooter}>
-        <Text style={styles.summaryLabel}>{label}</Text>
-        <Text style={styles.summaryTitle}>{title}</Text>
+        <View style={styles.summaryCopy}>
+          <Text
+            ellipsizeMode="clip"
+            numberOfLines={1}
+            style={styles.summaryTitle}>
+            {title}
+          </Text>
+          <Text
+            ellipsizeMode="clip"
+            numberOfLines={1}
+            style={styles.summaryLabel}>
+            {label}
+          </Text>
+        </View>
+        <View style={styles.summaryMetric}>
+          <Text
+            ellipsizeMode="clip"
+            numberOfLines={1}
+            style={styles.summaryCount}>
+            {count}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -63,8 +80,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     borderWidth: 1,
     elevation: 8,
-    height: 124,
-    justifyContent: 'flex-start',
+    minHeight: 96,
+    justifyContent: 'center',
     overflow: 'hidden',
     padding: spacing.sm,
     shadowColor: '#000000',
@@ -78,34 +95,40 @@ const styles = StyleSheet.create({
   },
   summaryCount: {
     color: palette.onSurface,
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
   },
-  summaryHeader: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  summaryFooter: {
-    marginTop: spacing.sm + 2,
+  summaryCopy: {
+    flex: 1,
+    justifyContent: 'center',
+    minWidth: 0,
   },
   summaryIconWrap: {
     alignItems: 'center',
     borderRadius: radius.xl,
-    height: 38,
+    height: 34,
     justifyContent: 'center',
-    width: 38,
+    width: 34,
   },
   summaryLabel: {
     color: palette.onSurfaceVariant,
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    fontWeight: '600',
+  },
+  summaryMetric: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    minWidth: 42,
+  },
+  summaryRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   summaryTitle: {
     color: palette.onSurface,
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

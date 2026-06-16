@@ -7,6 +7,12 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
     rules: {
+      'import/no-unresolved': [
+        'error',
+        {
+          ignore: ['expo-file-system', 'expo-file-system/legacy'],
+        },
+      ],
       'import/namespace': 'off',
     },
   },

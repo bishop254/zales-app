@@ -407,9 +407,6 @@ export default function JournalsScreen() {
           <View style={styles.heroHeaderRow}>
             <View style={styles.heroCopy}>
               <Text style={styles.heroTitle}>Journal Entries</Text>
-              <Text style={styles.heroBody}>
-                Keep your daily reflections, gratitude, affirmation, and progress in one dedicated workspace.
-              </Text>
             </View>
             <Pressable style={styles.addButton} onPress={handleOpenCreate}>
               <MaterialIcons color={palette.white} name={todayEntry ? 'edit' : 'add'} size={18} />
@@ -426,6 +423,7 @@ export default function JournalsScreen() {
               icon={item.icon}
               iconTone={item.iconTone}
               label={item.label}
+              onPress={() => undefined}
               style={{ width: cardWidth }}
               title={item.title}
             />

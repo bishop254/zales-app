@@ -496,7 +496,6 @@ export default function CoverFormScreen() {
                     onChangeText={(value) => updateForm('insurancePremium', value)}
                   />
                   <AuthPressableField
-                    autoCapitalize="characters"
                     error={getFieldError('expiryDate')}
                     icon="event"
                     label="Expiry date"

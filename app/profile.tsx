@@ -188,6 +188,9 @@ export default function ProfileScreen() {
     return <Redirect href="/login" />;
   }
 
+  const referralCode = session.referralCode;
+  const profileImageUrl = session.profileImageUrl;
+
   function handleBottomNavPress(key: string) {
     if (key === 'home') {
       router.replace('/dashboard');
@@ -215,15 +218,15 @@ export default function ProfileScreen() {
   }
 
   async function handleCopyReferralCode() {
-    const referralCode = profile?.referralCode ?? session.referralCode;
+    const nextReferralCode = profile?.referralCode ?? referralCode;
 
-    if (!referralCode?.trim()) {
+    if (!nextReferralCode?.trim()) {
       showToast('No referral code available yet.', 'error');
       return;
     }
 
     try {
-      await Clipboard.setStringAsync(referralCode);
+      await Clipboard.setStringAsync(nextReferralCode);
       showToast('Referral code copied.');
     } catch {
       showToast('Unable to copy referral code.', 'error');
@@ -238,7 +241,7 @@ export default function ProfileScreen() {
       onBackPress={() => router.back()}
       onNotificationPress={() => showToast('You are all caught up right now.')}
       onProfilePress={() => undefined}
-      profileImageUrl={profile?.profileImageUrl ?? session.profileImageUrl}
+      profileImageUrl={profile?.profileImageUrl ?? profileImageUrl}
       refreshControl={
         <RefreshControl
           onRefresh={() => {
