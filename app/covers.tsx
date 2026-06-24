@@ -238,6 +238,7 @@ export default function CoversScreen() {
   const { logout, session } = useAuth();
   const { hasActiveSubscription, subscriptionLoading } = useSubscription();
   const { showToast } = useToast();
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [covers, setCovers] = useState<CoverRecord[]>([]);
   const [coverSearch, setCoverSearch] = useState('');
@@ -434,6 +435,8 @@ export default function CoversScreen() {
   }
 
   function handleBottomNavPress(key: string) {
+    setCreateMenuOpen(false);
+
     if (key === 'home') {
       router.replace('/dashboard');
       return;
@@ -474,12 +477,25 @@ export default function CoversScreen() {
   }
 
   function handleLogout() {
+    setCreateMenuOpen(false);
     setMoreMenuOpen(false);
     logout({ animated: true, redirectToLogin: true });
   }
 
+  function handleOpenCreateMenu() {
+    setMoreMenuOpen(false);
+    setCoverActionMenuOpen(false);
+    setCreateMenuOpen((current) => !current);
+  }
+
   function handleOpenCreate() {
+    setCreateMenuOpen(false);
     router.push('/cover-form');
+  }
+
+  function handleOpenBulkImport() {
+    setCreateMenuOpen(false);
+    router.push('/cover-bulk-import');
   }
 
   function handleCoverPress(coverId: string, event: GestureResponderEvent) {
@@ -658,6 +674,34 @@ export default function CoversScreen() {
       <FloatingPageShell
         avatarLetter={avatarLetter}
         bottomSlot={<FloatingBottomNav activeKey={moreMenuOpen ? 'more' : 'covers'} onPress={handleBottomNavPress} />}
+        overlaySlot={
+          createMenuOpen ? (
+            <>
+              <Pressable style={styles.createMenuBackdrop} onPress={() => setCreateMenuOpen(false)} />
+              <View style={styles.createMenu}>
+                <Pressable style={styles.createMenuItem} onPress={handleOpenCreate}>
+                  <View style={[styles.createMenuIconWrap, styles.createMenuIconWrapPrimary]}>
+                    <MaterialIcons color={palette.primary} name="add-circle-outline" size={18} />
+                  </View>
+                  <View style={styles.createMenuCopy}>
+                    <Text style={styles.createMenuTitle}>Single item</Text>
+                    <Text style={styles.createMenuBody}>Add a single cover.</Text>
+                  </View>
+                </Pressable>
+                <View style={styles.createMenuSeparator} />
+                <Pressable style={styles.createMenuItem} onPress={handleOpenBulkImport}>
+                  <View style={[styles.createMenuIconWrap, styles.createMenuIconWrapSecondary]}>
+                    <MaterialIcons color={palette.onSecondaryContainer} name="upload-file" size={18} />
+                  </View>
+                  <View style={styles.createMenuCopy}>
+                    <Text style={styles.createMenuTitle}>Bulk import</Text>
+                    <Text style={styles.createMenuBody}>Add multiple covers from an excel file.</Text>
+                  </View>
+                </Pressable>
+              </View>
+            </>
+          ) : null
+        }
         notificationCount={totalNotificationCount}
         onBackPress={() => router.replace('/dashboard')}
         onNotificationPress={() => setNotificationsOpen(true)}
@@ -671,6 +715,7 @@ export default function CoversScreen() {
         }
         scrollViewProps={{
           onScrollBeginDrag: () => {
+            setCreateMenuOpen(false);
             setMoreMenuOpen(false);
             setCoverActionMenuOpen(false);
           },
@@ -681,9 +726,10 @@ export default function CoversScreen() {
             <View style={styles.heroCopy}>
               <Text style={styles.heroTitle}>Covers Overview</Text>
             </View>
-            <Pressable style={styles.addButton} onPress={handleOpenCreate}>
-              <MaterialIcons color={palette.white} name="add" size={18} />
+            <Pressable style={styles.addButton} onPress={handleOpenCreateMenu}>
+              <MaterialIcons color={palette.white} name={createMenuOpen ? 'close' : 'add'} size={18} />
               <Text style={styles.addButtonText}>Add cover</Text>
+              <MaterialIcons color={palette.white} name="arrow-drop-down" size={18} />
             </Pressable>
           </View>
         </View>
@@ -1306,6 +1352,73 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: palette.white,
+    fontSize: typography.bodySmall,
+    fontWeight: '700',
+  },
+  createMenu: {
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderColor: 'rgba(0,92,171,0.08)',
+    borderRadius: 24,
+    borderWidth: 1,
+    elevation: 20,
+    overflow: 'hidden',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    position: 'absolute',
+    right: spacing.marginMobile,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.24,
+    shadowRadius: 32,
+    top: 152,
+    width: 246,
+    zIndex: 50,
+  },
+  createMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 40,
+  },
+  createMenuBody: {
+    color: palette.onSurfaceVariant,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  createMenuCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  createMenuIconWrap: {
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  createMenuIconWrapPrimary: {
+    backgroundColor: 'rgba(0, 92, 171, 0.1)',
+  },
+  createMenuIconWrapSecondary: {
+    backgroundColor: 'rgba(207, 225, 248, 0.35)',
+  },
+  createMenuItem: {
+    alignItems: 'center',
+    borderRadius: radius.lg,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minHeight: 56,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  createMenuSeparator: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(192, 199, 214, 0.7)',
+    height: 1,
+    marginVertical: 2,
+    width: '92%',
+  },
+  createMenuTitle: {
+    color: palette.onSurface,
     fontSize: typography.bodySmall,
     fontWeight: '700',
   },

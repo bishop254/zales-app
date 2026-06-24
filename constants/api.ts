@@ -1,12 +1,15 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-function getDefaultBaseUrl() {
-  // const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-  const configuredBaseUrl = 'https://mig-burs.com/zales/';
+function normalizeBaseUrl(value: string) {
+  return value.trim().replace(/\/+$/, '');
+}
 
-  if (configuredBaseUrl) {
-    return configuredBaseUrl;
+function getDefaultBaseUrl() {
+  const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+  if (configuredBaseUrl?.trim()) {
+    return normalizeBaseUrl(configuredBaseUrl);
   }
 
   const hostUri =
@@ -17,7 +20,7 @@ function getDefaultBaseUrl() {
   const hostname = hostUri.split(':')[0];
 
   if (hostname) {
-    return `http://${hostname}:3000`;
+    return normalizeBaseUrl(`http://${hostname}:3000`);
   }
 
   if (Platform.OS === 'android') {
