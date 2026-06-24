@@ -1,8 +1,8 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Redirect, router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { AppModal } from '@/components/app/app-modal';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { BulkImportActions } from '@/components/covers/bulk-import/bulk-import-actions';
 import { BulkImportStepper } from '@/components/covers/bulk-import/bulk-import-stepper';
@@ -12,6 +12,8 @@ import { ExcelFilePicker } from '@/components/covers/bulk-import/excel-file-pick
 import { ImportPreviewTable } from '@/components/covers/bulk-import/import-preview-table';
 import { ImportValidationSummary } from '@/components/covers/bulk-import/import-validation-summary';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { UnauthorizedError } from '@/features/api/auth-session';
+import { bulkImportCovers } from '@/features/covers/covers-api';
 import { useBulkCoverImport } from '@/features/covers/bulk-import/useBulkCoverImport';
 import { useAuth } from '@/providers/auth-provider';
 import { useToast } from '@/providers/toast-provider';
@@ -35,14 +37,12 @@ export default function CoverBulkImportScreen() {
     previewRows,
     resetImport,
     setPreviewFilter,
-    setSubmissionPreviewVisible,
     step,
-    submissionPreviewVisible,
-    submitPreview,
-    submittedPayloadText,
     summary,
     updateMapping,
+    getValidPayload,
   } = useBulkCoverImport();
+  const [submitting, setSubmitting] = useState(false);
 
   if (!session) {
     return <Redirect href="/login" />;
@@ -68,13 +68,39 @@ export default function CoverBulkImportScreen() {
   }
 
   function handleSubmit() {
-    if (summary.invalidRows > 0) {
-      showToast('Fix invalid rows before showing the final array.', 'error');
+    if (!session?.accessToken || submitting) {
       return;
     }
 
-    submitPreview();
-    showToast('Final payload array prepared. Review it before backend integration.');
+    if (summary.invalidRows > 0) {
+      showToast('Fix invalid rows before importing covers.', 'error');
+      return;
+    }
+
+    const items = getValidPayload();
+    if (!items.length) {
+      showToast('Generate a valid preview before importing covers.', 'error');
+      return;
+    }
+
+    void (async () => {
+      try {
+        setSubmitting(true);
+        const result = await bulkImportCovers(session.accessToken, { items });
+        showToast(
+          result.createdCount === 1
+            ? '1 cover imported successfully.'
+            : `${result.createdCount} covers imported successfully.`
+        );
+        router.replace('/covers');
+      } catch (error) {
+        if (!(error instanceof UnauthorizedError)) {
+          showToast(error instanceof Error ? error.message : 'Unable to import covers.', 'error');
+        }
+      } finally {
+        setSubmitting(false);
+      }
+    })();
   }
 
   return (
@@ -135,7 +161,7 @@ export default function CoverBulkImportScreen() {
 
         <BulkImportActions
           disableSubmit={summary.invalidRows > 0 || previewRows.length === 0}
-          loading={loading}
+          loading={loading || submitting}
           onBack={goBack}
           onNext={handleNext}
           onReset={resetImport}
@@ -143,27 +169,6 @@ export default function CoverBulkImportScreen() {
           step={step}
         />
       </FloatingPageShell>
-
-      <AppModal
-        footer={
-          <Pressable style={styles.modalButton} onPress={() => setSubmissionPreviewVisible(false)}>
-            <Text style={styles.modalButtonText}>Close</Text>
-          </Pressable>
-        }
-        frameStyle={styles.previewModalFrame}
-        title="Final Payload Array"
-        visible={submissionPreviewVisible}
-        onClose={() => setSubmissionPreviewVisible(false)}>
-        <Text style={styles.modalIntro}>
-          This is the transformed `CreateCoverPayload[]` that would be sent to the backend once the API endpoint is ready.
-        </Text>
-
-        <View style={styles.payloadPreviewCard}>
-          <ScrollView nestedScrollEnabled style={styles.payloadScroll}>
-            <Text style={styles.payloadText}>{submittedPayloadText}</Text>
-          </ScrollView>
-        </View>
-      </AppModal>
     </>
   );
 }
@@ -204,45 +209,6 @@ const styles = StyleSheet.create({
     color: palette.onSurface,
     fontSize: typography.title,
     fontWeight: '700',
-  },
-  modalButton: {
-    alignItems: 'center',
-    backgroundColor: palette.primary,
-    borderRadius: radius.pill,
-    justifyContent: 'center',
-    minHeight: 44,
-    paddingHorizontal: spacing.lg,
-  },
-  modalButtonText: {
-    color: palette.white,
-    fontSize: typography.bodySmall,
-    fontWeight: '700',
-  },
-  modalIntro: {
-    color: palette.onSurfaceVariant,
-    fontSize: typography.bodySmall,
-    lineHeight: 20,
-  },
-  payloadPreviewCard: {
-    backgroundColor: 'rgba(246, 249, 255, 0.94)',
-    borderColor: 'rgba(0, 92, 171, 0.08)',
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    marginTop: spacing.md,
-    maxHeight: 420,
-    padding: spacing.sm,
-  },
-  payloadScroll: {
-    maxHeight: 392,
-  },
-  payloadText: {
-    color: palette.onSurface,
-    fontFamily: 'monospace',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  previewModalFrame: {
-    width: '92%',
   },
   summaryWrap: {
     marginHorizontal: spacing.marginMobile,

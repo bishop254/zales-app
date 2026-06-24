@@ -47,6 +47,14 @@ export type CreateCoverPayload = {
 
 export type UpdateCoverPayload = Partial<CreateCoverPayload>;
 
+export type BulkImportCoversPayload = {
+  items: CreateCoverPayload[];
+};
+
+export type BulkImportCoversResponse = {
+  createdCount: number;
+};
+
 function authHeaders(accessToken: string) {
   return {
     Accept: 'application/json',
@@ -77,6 +85,19 @@ export async function createCover(
   });
 
   return parseApiEnvelope<CoverRecord>(response);
+}
+
+export async function bulkImportCovers(
+  accessToken: string,
+  payload: BulkImportCoversPayload
+): Promise<BulkImportCoversResponse> {
+  const response = await fetch(`${apiConfig.baseUrl}/covers/bulk-import`, {
+    body: JSON.stringify(payload),
+    headers: authHeaders(accessToken),
+    method: 'POST',
+  });
+
+  return parseApiEnvelope<BulkImportCoversResponse>(response);
 }
 
 export async function getCoverById(accessToken: string, coverId: string): Promise<CoverRecord> {

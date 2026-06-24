@@ -44,8 +44,6 @@ export function useBulkCoverImport() {
   const [loading, setLoading] = useState(false);
   const [fileError, setFileError] = useState('');
   const [mappingErrors, setMappingErrors] = useState<Record<string, string>>({});
-  const [submissionPreviewVisible, setSubmissionPreviewVisible] = useState(false);
-  const [submittedPayloadText, setSubmittedPayloadText] = useState('');
 
   const summary = useMemo(() => validateBulkCoverRows(previewRows), [previewRows]);
 
@@ -144,8 +142,6 @@ export function useBulkCoverImport() {
     setFileError('');
     setMappingErrors({});
     setStep('file');
-    setSubmissionPreviewVisible(false);
-    setSubmittedPayloadText('');
   }
 
   function goBack() {
@@ -196,15 +192,10 @@ export function useBulkCoverImport() {
     return true;
   }
 
-  function submitPreview() {
-    const validPayload = previewRows
+  function getValidPayload() {
+    return previewRows
       .filter((row) => row.isValid && row.payload)
       .map((row) => row.payload!);
-
-    const payloadText = JSON.stringify(validPayload, null, 2);
-    console.log('Bulk cover import payload preview:', validPayload);
-    setSubmittedPayloadText(payloadText);
-    setSubmissionPreviewVisible(true);
   }
 
   return {
@@ -224,11 +215,8 @@ export function useBulkCoverImport() {
     selectedFile,
     setPreviewFilter,
     step,
-    submissionPreviewVisible,
-    submittedPayloadText,
     summary,
-    submitPreview,
-    setSubmissionPreviewVisible,
+    getValidPayload,
     updateMapping,
     generatePreview,
   };
