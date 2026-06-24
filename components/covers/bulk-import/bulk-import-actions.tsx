@@ -41,7 +41,7 @@ export function BulkImportActions({
             style={[styles.button, disableSubmit || loading ? styles.buttonDisabled : null]}
             onPress={onSubmit}>
             {loading ? <ActivityIndicator color={palette.onPrimary} size="small" /> : null}
-            <Text style={styles.buttonText}>{loading ? 'Importing...' : 'Import Covers'}</Text>
+            <Text style={styles.buttonText}>{loading ? 'Importing Valid Records...' : 'Import Valid Records'}</Text>
           </Pressable>
         ) : (
           <Pressable style={[styles.button, loading ? styles.buttonDisabled : null]} disabled={loading} onPress={onNext}>

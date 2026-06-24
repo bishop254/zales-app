@@ -13,10 +13,17 @@ type ImportPreviewTableProps = {
 const filterOptions: PreviewFilter[] = ['ALL', 'VALID', 'INVALID'];
 
 export function ImportPreviewTable({ filter, onChangeFilter, rows }: ImportPreviewTableProps) {
+  const validCount = rows.filter((row) => row.isValid).length;
+
   return (
     <View style={styles.sectionCard}>
       <Text style={styles.sectionTitle}>Step 4: Preview and Validate</Text>
-      <Text style={styles.helperText}>Review the transformed rows below. Submission stays disabled until all rows are valid.</Text>
+      <Text style={styles.helperText}>
+        Review the transformed rows below. When you import, we will submit only the valid records and leave invalid rows out.
+      </Text>
+      <Text style={styles.summaryText}>
+        {validCount === 1 ? '1 valid record is ready to submit.' : `${validCount} valid records are ready to submit.`}
+      </Text>
 
       <View style={styles.filterRow}>
         {filterOptions.map((option) => (
@@ -176,6 +183,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: palette.onSurface,
     fontSize: typography.title,
+    fontWeight: '700',
+  },
+  summaryText: {
+    color: palette.primary,
+    fontSize: typography.bodySmall,
     fontWeight: '700',
   },
   statusDot: {

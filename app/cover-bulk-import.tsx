@@ -34,7 +34,6 @@ export default function CoverBulkImportScreen() {
     parsedFile,
     pickFile,
     previewFilter,
-    previewRows,
     resetImport,
     setPreviewFilter,
     step,
@@ -49,6 +48,7 @@ export default function CoverBulkImportScreen() {
   }
 
   const avatarLetter = ((session.name?.trim() || session.email || '?').slice(0, 1)).toUpperCase();
+  const validPayload = getValidPayload();
 
   function handleNext() {
     if (step === 'defaults') {
@@ -72,21 +72,15 @@ export default function CoverBulkImportScreen() {
       return;
     }
 
-    if (summary.invalidRows > 0) {
-      showToast('Fix invalid rows before importing covers.', 'error');
-      return;
-    }
-
-    const items = getValidPayload();
-    if (!items.length) {
-      showToast('Generate a valid preview before importing covers.', 'error');
+    if (!validPayload.length) {
+      showToast('Add at least one valid row before importing covers.', 'error');
       return;
     }
 
     void (async () => {
       try {
         setSubmitting(true);
-        const result = await bulkImportCovers(session.accessToken, { items });
+        const result = await bulkImportCovers(session.accessToken, { items: validPayload });
         showToast(
           result.createdCount === 1
             ? '1 cover imported successfully.'
@@ -160,7 +154,7 @@ export default function CoverBulkImportScreen() {
         ) : null}
 
         <BulkImportActions
-          disableSubmit={summary.invalidRows > 0 || previewRows.length === 0}
+          disableSubmit={validPayload.length === 0}
           loading={loading || submitting}
           onBack={goBack}
           onNext={handleNext}
