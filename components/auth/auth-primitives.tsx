@@ -461,10 +461,7 @@ export function ConsentRow({ onValueChange, value }: ConsentRowProps) {
 export function AuthBrandMark() {
   return (
     <View style={styles.brandMark}>
-      <View style={styles.brandBadge}>
-        <MaterialIcons color={palette.onPrimary} name="rocket-launch" size={48} />
-      </View>
-      <Text style={styles.brandTitle}>ManagePro</Text>
+      <AppLogo tint="light" />
     </View>
   );
 }
@@ -515,28 +512,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: palette.overlayDark,
   },
-  brandBadge: {
-    alignItems: 'center',
-    backgroundColor: palette.primary,
-    borderRadius: radius.lg,
-    height: 96,
-    justifyContent: 'center',
-    shadowColor: '#005CAB',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    width: 96,
-  },
   brandMark: {
     alignItems: 'center',
     gap: spacing.lg,
     justifyContent: 'center',
-  },
-  brandTitle: {
-    color: palette.white,
-    fontSize: typography.display,
-    fontWeight: '700',
-    letterSpacing: -0.5,
   },
   button: {
     alignItems: 'center',

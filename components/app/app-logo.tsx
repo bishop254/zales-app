@@ -1,7 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
-
-import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { Image, StyleSheet, View } from 'react-native';
 
 type AppLogoProps = {
   tint?: 'dark' | 'light';
@@ -9,14 +6,15 @@ type AppLogoProps = {
 };
 
 export function AppLogo({ compact = false, tint = 'dark' }: AppLogoProps) {
-  const isLight = tint === 'light';
+  void tint;
 
   return (
     <View style={styles.row}>
-      <View style={[styles.badge, compact ? styles.badgeCompact : null]}>
-        <MaterialIcons color={palette.white} name="rocket-launch" size={28} />
-      </View>
-      <Text style={[styles.wordmark, isLight ? styles.wordmarkLight : styles.wordmarkDark]}>ManagePro</Text>
+      <Image
+        resizeMode="contain"
+        source={require('@/assets/images/managewizard-logo.png')}
+        style={[styles.logoImage, compact ? styles.logoImageCompact : null]}
+      />
     </View>
   );
 }
@@ -25,28 +23,14 @@ const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.md,
-  },
-  badge: {
-    alignItems: 'center',
-    backgroundColor: palette.primary,
-    borderRadius: radius.md,
-    height: 48,
     justifyContent: 'center',
-    width: 48,
   },
-  badgeCompact: {
-    height: 36,
-    width: 36,
+  logoImage: {
+    height: 72,
+    width: 240,
   },
-  wordmark: {
-    fontSize: typography.title,
-    fontWeight: '800',
-  },
-  wordmarkDark: {
-    color: palette.primary,
-  },
-  wordmarkLight: {
-    color: palette.onPrimary,
+  logoImageCompact: {
+    height: 54,
+    width: 188,
   },
 });

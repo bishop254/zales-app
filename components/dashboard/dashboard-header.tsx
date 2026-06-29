@@ -24,7 +24,7 @@ export function DashboardHeader({
         <View style={styles.brandBadge}>
           <MaterialIcons color={palette.onPrimary} name="leaderboard" size={20} />
         </View>
-        <Text style={styles.brandText}>ManagePro</Text>
+        <Text style={styles.brandText}>ManageWizard</Text>
       </View>
 
       <View style={styles.topBarActions}>

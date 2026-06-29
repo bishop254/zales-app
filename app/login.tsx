@@ -1,9 +1,9 @@
-import { MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { AppLogo } from '@/components/app/app-logo';
 import { AuthBackground, AuthButton, AuthCard, AuthTextField } from '@/components/auth/auth-primitives';
 import { palette, spacing, typography } from '@/constants/app-theme';
 import { validateEmail, validatePassword } from '@/features/auth/validation';
@@ -181,10 +181,8 @@ export default function LoginScreen() {
       <AuthBackground scroll={false}>
         <AuthCard scrollable styleVariant="compact">
           <View style={styles.brandWrap}>
-            <View style={styles.brandIcon}>
-              <MaterialIcons color={palette.onPrimary} name="rocket-launch" size={28} />
-            </View>
-            <Text style={styles.brandName}>ManagePro</Text>
+            <AppLogo compact />
+            <Text style={styles.brandName}>ManageWizard</Text>
             <Text style={styles.brandCaption}>Sign in to manage your pipeline.</Text>
           </View>
 
@@ -291,15 +289,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     textAlign: 'center',
   },
-  brandIcon: {
-    alignItems: 'center',
-    backgroundColor: palette.primary,
-    borderRadius: 8,
-    height: 48,
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-    width: 48,
-  },
   brandName: {
     color: palette.primary,
     fontSize: typography.display,
@@ -307,6 +296,7 @@ const styles = StyleSheet.create({
   },
   brandWrap: {
     alignItems: 'center',
+    gap: spacing.xs,
     marginBottom: spacing.xl,
   },
   footer: {

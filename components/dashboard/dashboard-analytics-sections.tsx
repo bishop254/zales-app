@@ -1,5 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
 
 import { SegmentedDonutChart } from "@/components/charts/donut-chart";
@@ -130,37 +130,94 @@ export function DashboardSummaryAnalyticsCard({
   onPress,
   style,
 }: SummaryCardProps) {
+  const { width } = useWindowDimensions();
   const iconName = summaryIconMap[card.icon ?? ""] ?? "insights";
   const iconTint = summaryIconTintMap[card.icon ?? ""] ?? {
     bg: "rgba(0,92,171,0.1)",
     color: palette.primary,
   };
   const trend = trendStyles(card.trendDirection);
+  const isCompactScreen = width < 390;
+  const isSmallScreen = width < 350;
+
+  const responsiveCardStyles = {
+    card: isSmallScreen
+      ? styles.summaryCardSmall
+      : isCompactScreen
+        ? styles.summaryCardCompact
+        : null,
+    iconWrap: isSmallScreen
+      ? styles.summaryIconWrapSmall
+      : isCompactScreen
+        ? styles.summaryIconWrapCompact
+        : null,
+    value: isSmallScreen
+      ? styles.summaryValueSmall
+      : isCompactScreen
+        ? styles.summaryValueCompact
+        : null,
+    title: isSmallScreen
+      ? styles.summaryTitleSmall
+      : isCompactScreen
+        ? styles.summaryTitleCompact
+        : null,
+    subtitle: isSmallScreen
+      ? styles.summarySubtitleSmall
+      : isCompactScreen
+        ? styles.summarySubtitleCompact
+        : null,
+    trendRow: isSmallScreen
+      ? styles.summaryTrendRowSmall
+      : isCompactScreen
+        ? styles.summaryTrendRowCompact
+        : null,
+    trendText: isSmallScreen
+      ? styles.summaryTrendTextSmall
+      : isCompactScreen
+        ? styles.summaryTrendTextCompact
+        : null,
+  };
+  const iconSize = isSmallScreen ? 18 : isCompactScreen ? 20 : 22;
+  const trendIconSize = isSmallScreen ? 11 : 13;
 
   return (
-    <Pressable style={[styles.summaryCard, style]} onPress={onPress}>
+    <Pressable style={[styles.summaryCard, responsiveCardStyles.card, style]} onPress={onPress}>
       <View style={styles.summaryMetricRow}>
         <View
-          style={[styles.summaryIconWrap, { backgroundColor: iconTint.bg }]}
+          style={[styles.summaryIconWrap, responsiveCardStyles.iconWrap, { backgroundColor: iconTint.bg }]}
         >
-          <MaterialIcons color={iconTint.color} name={iconName} size={22} />
+          <MaterialIcons color={iconTint.color} name={iconName} size={iconSize} />
         </View>
-        <Text style={styles.summaryValue}>{card.value}</Text>
+        <Text adjustsFontSizeToFit minimumFontScale={0.75} numberOfLines={1} style={[styles.summaryValue, responsiveCardStyles.value]}>
+          {card.value}
+        </Text>
       </View>
 
-      <Text numberOfLines={1} style={styles.summaryTitle}>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.72}
+        numberOfLines={1}
+        style={[styles.summaryTitle, responsiveCardStyles.title]}
+      >
         {card.label}
       </Text>
 
-      <Text numberOfLines={1} style={styles.summarySubtitle}>
+      <Text
+        adjustsFontSizeToFit
+        minimumFontScale={0.72}
+        numberOfLines={1}
+        style={[styles.summarySubtitle, responsiveCardStyles.subtitle]}
+      >
         {card.subtitle ?? card.category}
       </Text>
 
-      <View style={[styles.summaryTrendRow, { backgroundColor: trend.bg }]}>
-        <MaterialIcons color={trend.color} name={trend.icon} size={13} />
+      <View style={[styles.summaryTrendRow, responsiveCardStyles.trendRow, { backgroundColor: trend.bg }]}>
+        <MaterialIcons color={trend.color} name={trend.icon} size={trendIconSize} />
         <Text
+          adjustsFontSizeToFit
+          minimumFontScale={0.72}
           numberOfLines={1}
-          style={[styles.summaryTrendText, { color: trend.color }]}
+          style={[styles.summaryTrendText, responsiveCardStyles.trendText, { color: trend.color }]}
         >
           {card.trendPercentage ? `${Math.abs(card.trendPercentage)}%` : "0%"}
           {card.trendDirection === "neutral" ? " stable" : " vs last week"}
@@ -1039,12 +1096,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 14,
   },
+  summaryCardCompact: {
+    minHeight: 132,
+    padding: spacing.sm,
+  },
+  summaryCardSmall: {
+    minHeight: 124,
+    padding: spacing.xs + 6,
+  },
   summaryIconWrap: {
     alignItems: "center",
     borderRadius: 14,
     height: 38,
     justifyContent: "center",
     width: 38,
+  },
+  summaryIconWrapCompact: {
+    borderRadius: 13,
+    height: 34,
+    width: 34,
+  },
+  summaryIconWrapSmall: {
+    borderRadius: 12,
+    height: 30,
+    width: 30,
   },
   summaryMetricRow: {
     alignItems: "center",
@@ -1057,11 +1132,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
+  summarySubtitleCompact: {
+    fontSize: 12,
+  },
+  summarySubtitleSmall: {
+    fontSize: 11,
+  },
   summaryTitle: {
     color: palette.onSurface,
     fontSize: 15,
     fontWeight: "600",
     marginTop: spacing.xs,
+  },
+  summaryTitleCompact: {
+    fontSize: 14,
+    marginTop: 6,
+  },
+  summaryTitleSmall: {
+    fontSize: 13,
+    marginTop: 4,
   },
   summaryTrendRow: {
     alignItems: "center",
@@ -1074,8 +1163,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
+  summaryTrendRowCompact: {
+    gap: 3,
+    marginTop: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  summaryTrendRowSmall: {
+    gap: 3,
+    marginTop: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
   summaryTrendText: { flexShrink: 1, fontSize: 10, fontWeight: "700" },
+  summaryTrendTextCompact: { fontSize: 9.5 },
+  summaryTrendTextSmall: { fontSize: 8.5 },
   summaryValue: { color: palette.onSurface, fontSize: 24, fontWeight: "700" },
+  summaryValueCompact: { fontSize: 21 },
+  summaryValueSmall: { fontSize: 18 },
   supportCopy: { flex: 1, gap: 2 },
   supportHeader: {
     alignItems: "center",

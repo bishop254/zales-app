@@ -230,7 +230,7 @@ export default function RegisterScreen() {
         </View>
       ) : null}
       <AuthHeader
-        subtitle="Enter your details to get started with ManagePro."
+        subtitle="Enter your details to get started with ManageWizard."
         title="Create an Account"
       />
       <View style={styles.formStack}>

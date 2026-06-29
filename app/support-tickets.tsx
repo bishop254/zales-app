@@ -74,12 +74,12 @@ const PRIORITY_COLOURS: Record<string, string> = {
 };
 
 const SUPPORT_COMPANY_DETAILS = {
-  companyName: 'ManagePro',
-  email: 'support@managepro.app',
+  companyName: 'ManageWizard',
+  email: 'support@managewizard.app',
   phone: '+254 700 000 000',
   supportHours: 'Monday to Friday, 8:00 AM to 5:00 PM',
-  websiteLabel: 'www.managepro.app',
-  websiteUrl: 'https://www.managepro.app',
+  websiteLabel: 'www.managewizard.app',
+  websiteUrl: 'https://www.managewizard.app',
 };
 
 function formatDate(iso: string) {
