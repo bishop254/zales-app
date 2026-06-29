@@ -6,7 +6,7 @@ function normalizeBaseUrl(value: string) {
 }
 
 function getDefaultBaseUrl() {
-  const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+  const configuredBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://aura-tech-africa.com/zales';
 
   if (configuredBaseUrl?.trim()) {
     return normalizeBaseUrl(configuredBaseUrl);
