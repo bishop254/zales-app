@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-
 import type { ExpoConfig } from 'expo/config';
 
 const { expo: staticConfig } = require('./app.json') as { expo: ExpoConfig };

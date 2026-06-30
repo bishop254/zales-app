@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ManageWizard",
-    "slug": "managewizard",
+    "slug": "manage-wizard",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/managewizard-logo.png",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bishop254sorganization.promanager",
+      "bundleIdentifier": "com.cenchiureon.managewizard",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -23,7 +23,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.bishop254sorganization.promanager"
+      "package": "com.cenchiureon.managewizard",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -52,9 +53,8 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "e909787c-7cfa-4658-bf28-39d9780fba71"
+        "projectId": "4ca85faa-f15c-4693-8ea9-64b319dc4f18"
       }
-    },
-    "owner": "bishop254s-organization"
+    }
   }
 }

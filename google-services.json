@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1009653959493",
+    "project_id": "manage-wizard",
+    "storage_bucket": "manage-wizard.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1009653959493:android:549d83435db6943ccecc2c",
+        "android_client_info": {
+          "package_name": "com.cenchiureon.managewizard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-W3JLcI9ute3dEP6_4Z7Ao9ILH2ie0bA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

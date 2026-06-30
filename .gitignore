@@ -12,7 +12,6 @@ expo-env.d.ts
 # Native
 .kotlin/
 *.orig.*
-google-services.json
 *.jks
 *.p8
 *.p12
@@ -44,4 +43,5 @@ app-example
 /android
 assets/cover-form-style-guide.md
 js-254-firebase-adminsdk-fbsvc-8acfb2e205.json
+manage-wizard-firebase-adminsdk-fbsvc-c2bac5ae2d.json
 .env
