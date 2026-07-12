@@ -21,6 +21,7 @@ import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { SummaryCard, type SummaryCardTone } from '@/components/dashboard/summary-card';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps } from '@/constants/responsive-text';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
   getRecycleBinItemById,
@@ -481,8 +482,8 @@ export default function RecycleBinScreen() {
                         <MaterialIcons color={iconColor[config.tone]} name={config.icon} size={20} />
                       </View>
                       <View style={styles.itemCopy}>
-                        <Text numberOfLines={1} style={styles.itemTitle}>{item.displayTitle}</Text>
-                        <Text numberOfLines={1} style={styles.itemSubtitle}>
+                        <Text {...singleLineShrinkProps} style={styles.itemTitle}>{item.displayTitle}</Text>
+                        <Text {...singleLineShrinkProps} style={styles.itemSubtitle}>
                           {item.displayDescription || `${config.label} removed from the active workspace.`}
                         </Text>
                         <Text style={styles.itemMeta}>

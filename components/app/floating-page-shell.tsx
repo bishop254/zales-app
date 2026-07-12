@@ -14,6 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { imagery, palette, radius, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps } from '@/constants/responsive-text';
+import { useResponsiveTypography } from '@/hooks/use-responsive-typography';
 
 type FloatingPageShellProps = {
   avatarLetter: string;
@@ -44,6 +46,8 @@ export function FloatingPageShell({
   children,
   scrollViewProps,
 }: FloatingPageShellProps) {
+  const responsiveType = useResponsiveTypography();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
@@ -60,7 +64,11 @@ export function FloatingPageShell({
                 <MaterialIcons color={palette.primary} name="arrow-back" size={24} />
               </Pressable>
             ) : null}
-            <Text style={styles.topBarTitle}>{title}</Text>
+            <Text
+              {...singleLineShrinkProps}
+              style={[styles.topBarTitle, { fontSize: responsiveType.title, lineHeight: responsiveType.titleLineHeight }]}>
+              {title}
+            </Text>
           </View>
 
           <View style={styles.topBarActions}>
@@ -69,7 +77,13 @@ export function FloatingPageShell({
               {typeof notificationCount === 'number' ? (
                 notificationCount > 0 ? (
                   <View style={styles.notificationBadge}>
-                    <Text style={styles.notificationBadgeText}>{notificationCount > 99 ? '99+' : notificationCount}</Text>
+                    <Text
+                      style={[
+                        styles.notificationBadgeText,
+                        { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight },
+                      ]}>
+                      {notificationCount > 99 ? '99+' : notificationCount}
+                    </Text>
                   </View>
                 ) : null
               ) : (
@@ -81,7 +95,9 @@ export function FloatingPageShell({
                 <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatarFallback}>
-                  <Text style={styles.avatarFallbackText}>{avatarLetter}</Text>
+                  <Text style={[styles.avatarFallbackText, { fontSize: responsiveType.title }]}>
+                    {avatarLetter}
+                  </Text>
                 </View>
               )}
             </Pressable>

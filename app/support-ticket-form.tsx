@@ -9,6 +9,7 @@ import { AppMessageModal } from '@/components/app/app-message-modal';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { AuthSelectField, AuthTextField } from '@/components/auth/auth-primitives';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps } from '@/constants/responsive-text';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
   createSupportTicket,
@@ -335,7 +336,7 @@ export default function SupportTicketFormScreen() {
                     <MaterialIcons color={palette.primary} name="description" size={18} />
                   </View>
                   <View style={styles.attachmentCopy}>
-                    <Text numberOfLines={1} style={styles.attachmentName}>
+                    <Text {...singleLineShrinkProps} style={styles.attachmentName}>
                       {file.name}
                     </Text>
                     <Text style={styles.attachmentSize}>{formatFileSize(file.size ?? 0)}</Text>

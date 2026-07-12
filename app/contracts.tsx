@@ -29,6 +29,7 @@ import { AuthPressableField } from '@/components/auth/auth-primitives';
 import { apiConfig } from '@/constants/api';
 import { SummaryCard, type SummaryCardTone } from '@/components/dashboard/summary-card';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps } from '@/constants/responsive-text';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
   type ContractRecord,
@@ -934,7 +935,7 @@ export default function ContractsScreen() {
                     />
                     <View style={styles.contractCopy}>
                       <Text style={styles.contractTitle}>{contract.title}</Text>
-                      <Text numberOfLines={1} style={styles.contractMeta}>
+                      <Text {...singleLineShrinkProps} style={styles.contractMeta}>
                         {contract.parties}
                       </Text>
                     </View>

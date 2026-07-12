@@ -20,6 +20,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppLogo } from '@/components/app/app-logo';
 import { KeyboardResponsiveView } from '@/components/app/keyboard-responsive-view';
 import { imagery, palette, radius, spacing, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps } from '@/constants/responsive-text';
+import { useResponsiveTypography } from '@/hooks/use-responsive-typography';
 
 type AuthBackgroundProps = {
   children: ReactNode;
@@ -110,6 +112,8 @@ export function AuthBackground({ children, contentStyle, scroll = true }: AuthBa
 }
 
 export function SplitAuthLayout({ children }: SplitAuthLayoutProps) {
+  const responsiveType = useResponsiveTypography();
+
   return (
     <View style={styles.splitRoot}>
       <View style={styles.heroPanel}>
@@ -119,8 +123,15 @@ export function SplitAuthLayout({ children }: SplitAuthLayoutProps) {
         </ImageBackground>
         <View style={styles.heroTop}>
           <AppLogo tint="light" />
-          <Text style={styles.heroTitle}>Command your sales pipeline with precision.</Text>
-          <Text style={styles.heroBody}>
+          <Text
+            style={[
+              styles.heroTitle,
+              { fontSize: responsiveType.display, lineHeight: responsiveType.displayLineHeight },
+            ]}>
+            Command your sales pipeline with precision.
+          </Text>
+          <Text
+            style={[styles.heroBody, { fontSize: responsiveType.body, lineHeight: responsiveType.bodyLineHeight }]}>
             Join top-performing agents who rely on structured data and real-time insights to close deals faster.
           </Text>
         </View>
@@ -129,8 +140,16 @@ export function SplitAuthLayout({ children }: SplitAuthLayoutProps) {
             <Image source={{ uri: imagery.testimonial }} style={styles.quoteAvatarImage} />
           </View>
           <View style={styles.quoteCopy}>
-            <Text style={styles.quoteText}>&quot;The clearest view of my leads I&apos;ve ever had.&quot;</Text>
-            <Text style={styles.quoteAttribution}>Michael R., Top Agent</Text>
+            <Text style={[styles.quoteText, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+              &quot;The clearest view of my leads I&apos;ve ever had.&quot;
+            </Text>
+            <Text
+              style={[
+                styles.quoteAttribution,
+                { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight },
+              ]}>
+              Michael R., Top Agent
+            </Text>
           </View>
         </View>
       </View>
@@ -181,10 +200,26 @@ export function AuthHeader({
   subtitle: string;
   centered?: boolean;
 }) {
+  const responsiveType = useResponsiveTypography();
+
   return (
     <View style={[styles.headerBlock, centered ? styles.headerCentered : null]}>
-      <Text style={[styles.headerTitle, centered ? styles.textCenter : null]}>{title}</Text>
-      <Text style={[styles.headerSubtitle, centered ? styles.textCenter : null]}>{subtitle}</Text>
+      <Text
+        style={[
+          styles.headerTitle,
+          centered ? styles.textCenter : null,
+          { fontSize: responsiveType.headline, lineHeight: responsiveType.headlineLineHeight },
+        ]}>
+        {title}
+      </Text>
+      <Text
+        style={[
+          styles.headerSubtitle,
+          centered ? styles.textCenter : null,
+          { fontSize: responsiveType.bodySmall, lineHeight: responsiveType.bodySmallLineHeight },
+        ]}>
+        {subtitle}
+      </Text>
     </View>
   );
 }
@@ -196,6 +231,8 @@ export function AuthButton({
   title,
   variant = 'primary',
 }: AuthButtonProps) {
+  const responsiveType = useResponsiveTypography();
+
   return (
     <Pressable
       disabled={disabled || loading}
@@ -209,7 +246,12 @@ export function AuthButton({
         {loading ? (
           <ActivityIndicator color={variant === 'secondary' ? palette.primary : palette.onPrimary} size="small" />
         ) : null}
-        <Text style={[styles.buttonText, variant === 'secondary' ? styles.buttonTextSecondary : null]}>
+        <Text
+          style={[
+            styles.buttonText,
+            variant === 'secondary' ? styles.buttonTextSecondary : null,
+            { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight },
+          ]}>
           {title}
         </Text>
       </View>
@@ -231,15 +273,29 @@ export function AuthTextField({
 }: AuthTextFieldProps) {
   const [visible, setVisible] = useState(false);
   const isSecure = secureTextEntry && !visible;
+  const responsiveType = useResponsiveTypography();
 
   return (
     <View style={[styles.fieldBlock, containerStyle]}>
       <View style={styles.fieldLabelRow}>
-        <Text style={[styles.fieldLabel, error ? styles.fieldLabelError : null]}>{label}</Text>
-        {optionalLabel ? <Text style={styles.optionalLabel}>{optionalLabel}</Text> : null}
+        <Text
+          style={[
+            styles.fieldLabel,
+            error ? styles.fieldLabelError : null,
+            { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight },
+          ]}>
+          {label}
+        </Text>
+        {optionalLabel ? (
+          <Text style={[styles.optionalLabel, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+            {optionalLabel}
+          </Text>
+        ) : null}
         {actionLabel && onActionPress ? (
           <Pressable onPress={onActionPress}>
-            <Text style={styles.fieldAction}>{actionLabel}</Text>
+            <Text style={[styles.fieldAction, { fontSize: responsiveType.bodySmall, lineHeight: responsiveType.bodySmallLineHeight }]}>
+              {actionLabel}
+            </Text>
           </Pressable>
         ) : null}
       </View>
@@ -248,7 +304,7 @@ export function AuthTextField({
         <TextInput
           placeholderTextColor={palette.outlineVariant}
           secureTextEntry={isSecure}
-          style={styles.input}
+          style={[styles.input, { fontSize: responsiveType.body }]}
           {...props}
         />
         {secureToggle ? (
@@ -261,7 +317,11 @@ export function AuthTextField({
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+      {error ? (
+        <Text style={[styles.fieldError, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -279,14 +339,29 @@ export function AuthPressableField({
   placeholder,
   value,
 }: AuthPressableFieldProps) {
+  const responsiveType = useResponsiveTypography();
+
   return (
     <View style={[styles.fieldBlock, containerStyle]}>
       <View style={styles.fieldLabelRow}>
-        <Text style={[styles.fieldLabel, error ? styles.fieldLabelError : null]}>{label}</Text>
-        {optionalLabel ? <Text style={styles.optionalLabel}>{optionalLabel}</Text> : null}
+        <Text
+          style={[
+            styles.fieldLabel,
+            error ? styles.fieldLabelError : null,
+            { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight },
+          ]}>
+          {label}
+        </Text>
+        {optionalLabel ? (
+          <Text style={[styles.optionalLabel, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+            {optionalLabel}
+          </Text>
+        ) : null}
         {actionLabel && onActionPress ? (
           <Pressable onPress={onActionPress}>
-            <Text style={styles.fieldAction}>{actionLabel}</Text>
+            <Text style={[styles.fieldAction, { fontSize: responsiveType.bodySmall, lineHeight: responsiveType.bodySmallLineHeight }]}>
+              {actionLabel}
+            </Text>
           </Pressable>
         ) : null}
       </View>
@@ -300,11 +375,21 @@ export function AuthPressableField({
         ]}
         onPress={onPress}>
         {icon ? <MaterialIcons color={palette.outline} name={icon} size={20} /> : null}
-        <Text numberOfLines={1} style={[styles.selectValue, !value ? styles.selectPlaceholder : null]}>
+        <Text
+          {...singleLineShrinkProps}
+          style={[
+            styles.selectValue,
+            !value ? styles.selectPlaceholder : null,
+            { fontSize: responsiveType.body },
+          ]}>
           {value || placeholder}
         </Text>
       </Pressable>
-      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+      {error ? (
+        <Text style={[styles.fieldError, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -321,19 +406,35 @@ export function AuthSelectField({
 }: AuthSelectFieldProps) {
   const [open, setOpen] = useState(false);
   const selectedLabel = options.find((option) => option.value === value)?.label;
+  const responsiveType = useResponsiveTypography();
 
   return (
     <View style={[styles.fieldBlock, containerStyle]}>
       <View style={styles.fieldLabelRow}>
-        <Text style={[styles.fieldLabel, error ? styles.fieldLabelError : null]}>{label}</Text>
-        {optionalLabel ? <Text style={styles.optionalLabel}>{optionalLabel}</Text> : null}
+        <Text
+          style={[
+            styles.fieldLabel,
+            error ? styles.fieldLabelError : null,
+            { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight },
+          ]}>
+          {label}
+        </Text>
+        {optionalLabel ? (
+          <Text style={[styles.optionalLabel, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+            {optionalLabel}
+          </Text>
+        ) : null}
       </View>
       <Pressable
         style={[styles.inputShell, error ? styles.inputShellError : null]}
         onPress={() => setOpen((current) => !current)}>
         <Text
-          numberOfLines={1}
-          style={[styles.selectValue, !selectedLabel ? styles.selectPlaceholder : null]}>
+          {...singleLineShrinkProps}
+          style={[
+            styles.selectValue,
+            !selectedLabel ? styles.selectPlaceholder : null,
+            { fontSize: responsiveType.body },
+          ]}>
           {selectedLabel ?? placeholder}
         </Text>
         <MaterialIcons
@@ -352,14 +453,23 @@ export function AuthSelectField({
                 onSelect(option.value);
                 setOpen(false);
               }}>
-              <Text style={[styles.optionText, option.value === value ? styles.optionTextSelected : null]}>
+              <Text
+                style={[
+                  styles.optionText,
+                  option.value === value ? styles.optionTextSelected : null,
+                  { fontSize: responsiveType.body },
+                ]}>
                 {option.label}
               </Text>
             </Pressable>
           ))}
         </View>
       ) : null}
-      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+      {error ? (
+        <Text style={[styles.fieldError, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -381,19 +491,35 @@ export function AuthSearchSelectField({
   const filteredOptions = options.filter((option) =>
     option.label.toLowerCase().includes(query.trim().toLowerCase())
   );
+  const responsiveType = useResponsiveTypography();
 
   return (
     <View style={[styles.fieldBlock, containerStyle]}>
       <View style={styles.fieldLabelRow}>
-        <Text style={[styles.fieldLabel, error ? styles.fieldLabelError : null]}>{label}</Text>
-        {optionalLabel ? <Text style={styles.optionalLabel}>{optionalLabel}</Text> : null}
+        <Text
+          style={[
+            styles.fieldLabel,
+            error ? styles.fieldLabelError : null,
+            { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight },
+          ]}>
+          {label}
+        </Text>
+        {optionalLabel ? (
+          <Text style={[styles.optionalLabel, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+            {optionalLabel}
+          </Text>
+        ) : null}
       </View>
       <Pressable
         style={[styles.inputShell, error ? styles.inputShellError : null]}
         onPress={() => setOpen((current) => !current)}>
         <Text
-          numberOfLines={1}
-          style={[styles.selectValue, !selectedLabel ? styles.selectPlaceholder : null]}>
+          {...singleLineShrinkProps}
+          style={[
+            styles.selectValue,
+            !selectedLabel ? styles.selectPlaceholder : null,
+            { fontSize: responsiveType.body },
+          ]}>
           {selectedLabel ?? placeholder}
         </Text>
         <MaterialIcons
@@ -409,7 +535,7 @@ export function AuthSearchSelectField({
             <TextInput
               placeholder={searchPlaceholder}
               placeholderTextColor={palette.outlineVariant}
-              style={styles.searchInput}
+              style={[styles.searchInput, { fontSize: responsiveType.bodySmall }]}
               value={query}
               onChangeText={setQuery}
             />
@@ -425,23 +551,36 @@ export function AuthSearchSelectField({
                     setOpen(false);
                     setQuery('');
                   }}>
-                  <Text style={[styles.optionText, option.value === value ? styles.optionTextSelected : null]}>
+                  <Text
+                    style={[
+                      styles.optionText,
+                      option.value === value ? styles.optionTextSelected : null,
+                      { fontSize: responsiveType.body },
+                    ]}>
                     {option.label}
                   </Text>
                 </Pressable>
               ))
             ) : (
-              <Text style={styles.noResultsText}>No matches found.</Text>
+              <Text style={[styles.noResultsText, { fontSize: responsiveType.bodySmall, lineHeight: responsiveType.bodySmallLineHeight }]}>
+                No matches found.
+              </Text>
             )}
           </ScrollView>
         </View>
       ) : null}
-      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+      {error ? (
+        <Text style={[styles.fieldError, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 export function ConsentRow({ onValueChange, value }: ConsentRowProps) {
+  const responsiveType = useResponsiveTypography();
+
   return (
     <View style={styles.consentRow}>
       <Switch
@@ -450,7 +589,7 @@ export function ConsentRow({ onValueChange, value }: ConsentRowProps) {
         value={value}
         onValueChange={onValueChange}
       />
-      <Text style={styles.consentText}>
+      <Text style={[styles.consentText, { fontSize: responsiveType.bodySmall, lineHeight: responsiveType.bodySmallLineHeight }]}>
         I agree to the <Text style={styles.linkText}>Terms and Conditions</Text> and{' '}
         <Text style={styles.linkText}>Privacy Policy</Text>.
       </Text>
@@ -467,17 +606,23 @@ export function AuthBrandMark() {
 }
 
 export function LoadingRail() {
+  const responsiveType = useResponsiveTypography();
+
   return (
     <View style={styles.loadingWrap}>
       <View style={styles.loadingTrack}>
         <View style={styles.loadingBar} />
       </View>
-      <Text style={styles.loadingText}>Loading</Text>
+      <Text style={[styles.loadingText, { fontSize: responsiveType.labelCaps, lineHeight: responsiveType.labelCapsLineHeight }]}>
+        Loading
+      </Text>
     </View>
   );
 }
 
 export function OtpInputRow({ onChangeDigit, value }: OtpInputRowProps) {
+  const responsiveType = useResponsiveTypography();
+
   return (
     <View style={styles.otpRow}>
       {value.map((digit, index) => (
@@ -487,7 +632,7 @@ export function OtpInputRow({ onChangeDigit, value }: OtpInputRowProps) {
           maxLength={1}
           placeholder="·"
           placeholderTextColor={palette.onSurfaceVariant}
-          style={styles.otpCell}
+          style={[styles.otpCell, { fontSize: responsiveType.headline }]}
           textAlign="center"
           value={digit}
           onChangeText={(nextValue) => onChangeDigit(index, nextValue)}

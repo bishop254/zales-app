@@ -18,6 +18,8 @@ import { AppModal } from '@/components/app/app-modal';
 import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { twoLineShrinkProps } from '@/constants/responsive-text';
+import { useResponsiveTypography } from '@/hooks/use-responsive-typography';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
   getBillingBills,
@@ -82,6 +84,7 @@ export default function BillingScreen() {
   const { showToast } = useToast();
   const { reloadSubscription } = useSubscription();
   const { width } = useWindowDimensions();
+  const responsiveType = useResponsiveTypography();
 
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [overview, setOverview] = useState<BillingOverview | null>(null);
@@ -331,7 +334,9 @@ export default function BillingScreen() {
 
         {/* ── Hero ────────────────────────────────────────────────────── */}
         <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>Subscription</Text>
+          <Text style={[styles.heroTitle, { fontSize: responsiveType.display, lineHeight: responsiveType.displayLineHeight }]}>
+            Subscription
+          </Text>
         </View>
 
         {/* ── Subscription status ──────────────────────────────────────── */}
@@ -449,7 +454,7 @@ export default function BillingScreen() {
 
                   <Text style={styles.planName}>{plan.name}</Text>
                   {plan.description ? (
-                    <Text style={styles.planDescription} numberOfLines={2}>
+                    <Text {...twoLineShrinkProps} style={styles.planDescription}>
                       {plan.description}
                     </Text>
                   ) : null}

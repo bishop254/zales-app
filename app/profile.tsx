@@ -18,6 +18,7 @@ import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { SummaryCard, type SummaryCardTone } from '@/components/dashboard/summary-card';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps } from '@/constants/responsive-text';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
   getMyAuditLog,
@@ -280,10 +281,10 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.identityCopy}>
-              <Text numberOfLines={1} style={styles.identityName}>
+              <Text {...singleLineShrinkProps} style={styles.identityName}>
                 {fullName}
               </Text>
-              <Text numberOfLines={1} style={styles.identityEmail}>
+              <Text {...singleLineShrinkProps} style={styles.identityEmail}>
                 {profile?.email ?? session.email}
               </Text>
               <View style={styles.identityPills}>
@@ -291,7 +292,7 @@ export default function ProfileScreen() {
                   <Text style={styles.statusPillText}>{profile?.status ?? 'ACTIVE'}</Text>
                 </View>
                 <View style={styles.rolePill}>
-                  <Text numberOfLines={1} style={styles.rolePillText}>
+                  <Text {...singleLineShrinkProps} style={styles.rolePillText}>
                     {(profile?.roles ?? session.roles ?? ['USER']).join(', ')}
                   </Text>
                 </View>
@@ -302,7 +303,7 @@ export default function ProfileScreen() {
           <View style={styles.referralStrip}>
             <Text style={styles.referralLabel}>Referral Code</Text>
             <Pressable style={styles.referralRow} onPress={handleCopyReferralCode}>
-              <Text numberOfLines={1} style={styles.referralValue}>
+              <Text {...singleLineShrinkProps} style={styles.referralValue}>
                 {profile?.referralCode ?? session.referralCode ?? 'Unavailable'}
               </Text>
               <MaterialIcons color={palette.white} name="content-copy" size={18} />

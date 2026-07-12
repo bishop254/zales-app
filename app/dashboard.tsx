@@ -34,8 +34,10 @@ import {
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { ReferralCodePill } from '@/components/dashboard/referral-code-pill';
 import { imagery, palette, radius, spacing, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps } from '@/constants/responsive-text';
 import type { DashboardAnalyticsResponse, DashboardRecentActivity } from '@/features/analytics/analytics-types';
 import { useDashboardAnalytics } from '@/features/analytics/use-dashboard-analytics';
+import { useResponsiveTypography } from '@/hooks/use-responsive-typography';
 import { useAuth } from '@/providers/auth-provider';
 import { useSubscription } from '@/providers/subscription-provider';
 import { useToast } from '@/providers/toast-provider';
@@ -82,6 +84,7 @@ export default function DashboardScreen() {
   const { showToast } = useToast();
   const { hasActiveSubscription, reloadSubscription, subscriptionLoading } = useSubscription();
   const { width } = useWindowDimensions();
+  const responsiveType = useResponsiveTypography();
   const [activeTab, setActiveTab] = useState('home');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [adminPickerOpen, setAdminPickerOpen] = useState(false);
@@ -469,8 +472,11 @@ export default function DashboardScreen() {
               <View style={styles.loadingSpinnerWrap}>
                 <ActivityIndicator color={palette.primary} size="large" />
               </View>
-              <Text style={styles.loadingTitle}>{loadingMessages[loadingMessageIndex]}</Text>
-              <Text style={styles.loadingBody}>
+              <Text
+                style={[styles.loadingTitle, { fontSize: responsiveType.display, lineHeight: responsiveType.displayLineHeight }]}>
+                {loadingMessages[loadingMessageIndex]}
+              </Text>
+              <Text style={[styles.loadingBody, { fontSize: responsiveType.body, lineHeight: responsiveType.bodyLineHeight }]}>
                 {isAdmin
                   ? 'We are building a fresh snapshot of users, subscriptions, and activity across the platform.'
                   : 'We are pulling your latest tasks, covers, contracts, journals, and support insights.'}
@@ -494,7 +500,9 @@ export default function DashboardScreen() {
           }
           showsVerticalScrollIndicator={false}>
           <View style={styles.heroSection}>
-            <Text style={styles.welcomeTitle}>{welcomeTitle}</Text>
+            <Text style={[styles.welcomeTitle, { fontSize: responsiveType.display, lineHeight: responsiveType.displayLineHeight }]}>
+              {welcomeTitle}
+            </Text>
             {!isAdmin ? <ReferralCodePill code={referralCode} onCopy={handleCopyReferralCode} /> : null}
 
             {isAdmin ? (
@@ -517,7 +525,7 @@ export default function DashboardScreen() {
                 {adminMode === 'specific_user' ? (
                   <Pressable style={styles.selectedUserPill} onPress={openAdminPicker}>
                     <MaterialIcons color={palette.primary} name="person-search" size={16} />
-                    <Text style={styles.selectedUserText} numberOfLines={1}>
+                    <Text {...singleLineShrinkProps} style={styles.selectedUserText}>
                       {adminModeLabel}
                     </Text>
                   </Pressable>

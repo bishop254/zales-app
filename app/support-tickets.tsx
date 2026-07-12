@@ -28,6 +28,7 @@ import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { apiConfig } from '@/constants/api';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps, twoLineShrinkProps } from '@/constants/responsive-text';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
   type SupportTicketRecord,
@@ -517,7 +518,7 @@ export default function SupportTicketsScreen() {
                       <View style={[styles.statusDot, { backgroundColor: statusStyle.dot }]} />
                       <View style={styles.ticketCopy}>
                         <Text style={styles.ticketNumber}>{ticket.ticketNumber}</Text>
-                        <Text numberOfLines={1} style={styles.ticketSubject}>{ticket.subject}</Text>
+                        <Text {...singleLineShrinkProps} style={styles.ticketSubject}>{ticket.subject}</Text>
                         <Text style={styles.ticketMeta}>{CATEGORY_LABELS[ticket.category] ?? ticket.category}</Text>
                       </View>
                     </View>
@@ -699,7 +700,7 @@ export default function SupportTicketsScreen() {
               </View>
               <View style={styles.detailHeaderCopy}>
                 <Text style={styles.detailHeaderNumber}>{detailTicket.ticketNumber}</Text>
-                <Text numberOfLines={2} style={styles.detailHeaderSubject}>{detailTicket.subject}</Text>
+                <Text {...twoLineShrinkProps} style={styles.detailHeaderSubject}>{detailTicket.subject}</Text>
               </View>
               <View style={[styles.statusPill, { backgroundColor: getStatusStyle(detailTicket.status).bg }]}>
                 <Text style={[styles.statusText, { color: getStatusStyle(detailTicket.status).text }]}>
@@ -743,7 +744,7 @@ export default function SupportTicketsScreen() {
                       <MaterialIcons color={palette.primary} name="attach-file" size={16} />
                     </View>
                     <View style={styles.attachmentCopy}>
-                      <Text numberOfLines={1} style={styles.attachmentName}>{att.fileName}</Text>
+                      <Text {...singleLineShrinkProps} style={styles.attachmentName}>{att.fileName}</Text>
                       <Text style={styles.attachmentSize}>{formatFileSize(att.size)}</Text>
                     </View>
                     <MaterialIcons color={palette.onSurfaceVariant} name="open-in-new" size={16} />
@@ -905,7 +906,7 @@ export default function SupportTicketsScreen() {
               <View style={styles.attachmentIconWrap}>
                 <MaterialIcons color={palette.primary} name="attach-file" size={16} />
               </View>
-              <Text numberOfLines={1} style={styles.attachmentName}>{commentFile.name}</Text>
+              <Text {...singleLineShrinkProps} style={styles.attachmentName}>{commentFile.name}</Text>
               <Pressable hitSlop={8} onPress={() => setCommentFile(null)}>
                 <MaterialIcons color={palette.error} name="close" size={18} />
               </Pressable>

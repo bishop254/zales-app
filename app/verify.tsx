@@ -94,10 +94,24 @@ export default function VerifyScreen() {
     }
   }
 
-  function focusPreviousInput(index: number) {
-    if (!otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
+  function handleBackspace(index: number) {
+    setOtp((current) => {
+      const copy = [...current];
+
+      if (copy[index]) {
+        copy[index] = '';
+        return copy;
+      }
+
+      if (index > 0) {
+        copy[index - 1] = '';
+        requestAnimationFrame(() => {
+          inputRefs.current[index - 1]?.focus();
+        });
+      }
+
+      return copy;
+    });
   }
 
   async function handleVerify() {
@@ -176,6 +190,7 @@ export default function VerifyScreen() {
                 placeholderTextColor={palette.onSurfaceVariant}
                 style={styles.otpCell}
                 textAlign="center"
+                textAlignVertical="center"
                 value={digit}
                 onChangeText={(nextValue) => {
                   const sanitized = nextValue.replace(/[^0-9]/g, '').slice(-1);
@@ -184,7 +199,7 @@ export default function VerifyScreen() {
                 }}
                 onKeyPress={({ nativeEvent }) => {
                   if (nativeEvent.key === 'Backspace') {
-                    focusPreviousInput(index);
+                    handleBackspace(index);
                   }
                 }}
               />
@@ -259,8 +274,13 @@ const styles = StyleSheet.create({
     fontSize: typography.headline,
     fontWeight: '600',
     height: 60,
+    includeFontPadding: false,
+    lineHeight: 60,
     maxWidth: 46,
     minWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    verticalAlign: 'middle',
   },
   otpRow: {
     alignSelf: 'center',

@@ -21,6 +21,7 @@ import { FloatingBottomNav } from '@/components/app/floating-bottom-nav';
 import { FloatingPageShell } from '@/components/app/floating-page-shell';
 import { SummaryCard, type SummaryCardTone } from '@/components/dashboard/summary-card';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps } from '@/constants/responsive-text';
 import { UnauthorizedError } from '@/features/api/auth-session';
 import {
   deleteJournal,
@@ -466,7 +467,7 @@ export default function JournalsScreen() {
                     </View>
                     <View style={styles.journalCopy}>
                       <Text style={styles.journalDate}>{formatDate(journal.journalDate)}</Text>
-                      <Text numberOfLines={1} style={styles.journalPreview}>
+                      <Text {...singleLineShrinkProps} style={styles.journalPreview}>
                         {getPreviewText(journal)}
                       </Text>
                       <Text style={styles.journalMeta}>

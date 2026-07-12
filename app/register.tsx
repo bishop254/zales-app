@@ -28,6 +28,7 @@ import {
   africanDialCodeOptions,
 } from '@/constants/african-countries';
 import { palette, spacing, typography } from '@/constants/app-theme';
+import { useResponsiveTypography } from '@/hooks/use-responsive-typography';
 import {
   validateEmail,
   validateName,
@@ -61,6 +62,7 @@ export default function RegisterScreen() {
   const { loginWithGoogle, register } = useAuth();
   const { showToast } = useToast();
   const { width } = useWindowDimensions();
+  const responsiveType = useResponsiveTypography();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneCountryCode, setPhoneCountryCode] = useState('+254');
@@ -262,7 +264,9 @@ export default function RegisterScreen() {
           onBlur={() => markTouched('email')}
           onChangeText={setEmail}
         />
-        <Text style={styles.groupLabel}>Phone Number</Text>
+        <Text style={[styles.groupLabel, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+          Phone Number
+        </Text>
         <View style={styles.phoneRow}>
           <AuthSelectField
             containerStyle={styles.phoneCodeField}
@@ -316,7 +320,9 @@ export default function RegisterScreen() {
           }}
         />
         {touched.acceptedTerms && errors.acceptedTerms ? (
-          <Text style={styles.errorText}>{errors.acceptedTerms}</Text>
+          <Text style={[styles.errorText, { fontSize: responsiveType.label, lineHeight: responsiveType.labelLineHeight }]}>
+            {errors.acceptedTerms}
+          </Text>
         ) : null}
         <AuthButton
           disabled={!canSubmit || submitting}
@@ -333,7 +339,7 @@ export default function RegisterScreen() {
         />
       </View>
       <View style={styles.bottomTextWrap}>
-        <Text style={styles.bottomText}>
+        <Text style={[styles.bottomText, { fontSize: responsiveType.bodySmall, lineHeight: responsiveType.bodySmallLineHeight }]}>
           Already have an account?{' '}
           <Link href="/login" style={styles.bottomLink}>
             Log in here

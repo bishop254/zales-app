@@ -4,6 +4,8 @@ import type { StyleProp, ViewStyle } from "react-native";
 
 import { SegmentedDonutChart } from "@/components/charts/donut-chart";
 import { palette, radius, spacing, typography } from "@/constants/app-theme";
+import { singleLineShrinkProps, twoLineShrinkProps } from "@/constants/responsive-text";
+import { useResponsiveTypography } from "@/hooks/use-responsive-typography";
 import type {
   DashboardAnalyticsResponse,
   DashboardRecentActivity,
@@ -131,6 +133,7 @@ export function DashboardSummaryAnalyticsCard({
   style,
 }: SummaryCardProps) {
   const { width } = useWindowDimensions();
+  const responsiveType = useResponsiveTypography();
   const iconName = summaryIconMap[card.icon ?? ""] ?? "insights";
   const iconTint = summaryIconTintMap[card.icon ?? ""] ?? {
     bg: "rgba(0,92,171,0.1)",
@@ -188,25 +191,35 @@ export function DashboardSummaryAnalyticsCard({
         >
           <MaterialIcons color={iconTint.color} name={iconName} size={iconSize} />
         </View>
-        <Text adjustsFontSizeToFit minimumFontScale={0.75} numberOfLines={1} style={[styles.summaryValue, responsiveCardStyles.value]}>
+        <Text
+          {...singleLineShrinkProps}
+          style={[
+            styles.summaryValue,
+            responsiveCardStyles.value,
+            { fontSize: Math.max(responsiveType.headline, isSmallScreen ? 18 : isCompactScreen ? 20 : 22) },
+          ]}>
           {card.value}
         </Text>
       </View>
 
       <Text
-        adjustsFontSizeToFit
-        minimumFontScale={0.72}
-        numberOfLines={1}
-        style={[styles.summaryTitle, responsiveCardStyles.title]}
+        {...singleLineShrinkProps}
+        style={[
+          styles.summaryTitle,
+          responsiveCardStyles.title,
+          { fontSize: Math.max(responsiveType.bodySmall, isSmallScreen ? 13 : isCompactScreen ? 14 : 15) },
+        ]}
       >
         {card.label}
       </Text>
 
       <Text
-        adjustsFontSizeToFit
-        minimumFontScale={0.72}
-        numberOfLines={1}
-        style={[styles.summarySubtitle, responsiveCardStyles.subtitle]}
+        {...singleLineShrinkProps}
+        style={[
+          styles.summarySubtitle,
+          responsiveCardStyles.subtitle,
+          { fontSize: Math.max(responsiveType.label, isSmallScreen ? 11 : isCompactScreen ? 12 : 13) },
+        ]}
       >
         {card.subtitle ?? card.category}
       </Text>
@@ -214,10 +227,12 @@ export function DashboardSummaryAnalyticsCard({
       <View style={[styles.summaryTrendRow, responsiveCardStyles.trendRow, { backgroundColor: trend.bg }]}>
         <MaterialIcons color={trend.color} name={trend.icon} size={trendIconSize} />
         <Text
-          adjustsFontSizeToFit
-          minimumFontScale={0.72}
-          numberOfLines={1}
-          style={[styles.summaryTrendText, responsiveCardStyles.trendText, { color: trend.color }]}
+          {...singleLineShrinkProps}
+          style={[
+            styles.summaryTrendText,
+            responsiveCardStyles.trendText,
+            { color: trend.color, fontSize: Math.max(responsiveType.labelCaps, isSmallScreen ? 8.5 : isCompactScreen ? 9.5 : 10) },
+          ]}
         >
           {card.trendPercentage ? `${Math.abs(card.trendPercentage)}%` : "0%"}
           {card.trendDirection === "neutral" ? " stable" : " vs last week"}
@@ -379,10 +394,10 @@ export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
 
         <View style={styles.featureBodyCopy}>
           <Text style={styles.featureMetaLabel}>Plan valid until</Text>
-          <Text numberOfLines={1} style={styles.featureMetaValue}>
+          <Text {...singleLineShrinkProps} style={styles.featureMetaValue}>
             {subscription.validUntil ?? subscription.status}
           </Text>
-          <Text numberOfLines={1} style={styles.featureMetaHint}>
+          <Text {...singleLineShrinkProps} style={styles.featureMetaHint}>
             {planHint}
           </Text>
         </View>
@@ -396,7 +411,7 @@ export function SubscriptionCard({ subscription }: SubscriptionCardProps) {
       </View>
 
       <View style={styles.progressRow}>
-        <Text numberOfLines={1} style={styles.progressText}>
+        <Text {...singleLineShrinkProps} style={styles.progressText}>
           {daysRemaining} days remaining
         </Text>
         <View style={styles.progressTrack}>
@@ -420,11 +435,11 @@ export function SupportHealthCard({ supportHealth }: SupportHealthCardProps) {
           <MaterialIcons color="#16A34A" name="favorite" size={20} />
         </View>
         <View style={styles.supportCopy}>
-          <Text numberOfLines={1} style={styles.supportStatus}>
+          <Text {...singleLineShrinkProps} style={styles.supportStatus}>
             {supportHealth.status}
           </Text>
           <Text style={styles.featureMetaLabel}>Average response time</Text>
-          <Text numberOfLines={2} style={styles.supportTime}>
+          <Text {...twoLineShrinkProps} style={styles.supportTime}>
             {supportHealth.averageResponseTime ?? "Not available"}
           </Text>
         </View>
@@ -432,7 +447,7 @@ export function SupportHealthCard({ supportHealth }: SupportHealthCardProps) {
 
       <View style={styles.supportPill}>
         <MaterialIcons color="#16A34A" name="check-circle" size={15} />
-        <Text numberOfLines={1} style={styles.supportPillText}>
+        <Text {...singleLineShrinkProps} style={styles.supportPillText}>
           {supportHealth.openTickets ?? 0} open tickets
         </Text>
       </View>
@@ -505,10 +520,10 @@ export function RecentActivityList({
               </View>
 
               <View style={styles.activityCopy}>
-                <Text numberOfLines={1} style={styles.activityTitle}>
+                <Text {...singleLineShrinkProps} style={styles.activityTitle}>
                   {item.title}
                 </Text>
-                <Text numberOfLines={1} style={styles.activitySubtitle}>
+                <Text {...singleLineShrinkProps} style={styles.activitySubtitle}>
                   {item.subtitle || "Recent update"}
                 </Text>
               </View>
@@ -516,7 +531,7 @@ export function RecentActivityList({
               <View style={styles.activityTrail}>
                 <View style={styles.activityTag}>
                   <Text
-                    numberOfLines={1}
+                    {...singleLineShrinkProps}
                     style={[
                       styles.activityTagText,
                       { color: activityIconColor(item.type) },
@@ -576,7 +591,7 @@ function BreakdownRow({
     <View style={styles.breakdownRow}>
       <View style={styles.breakdownLabelRow}>
         <View style={[styles.legendDot, { backgroundColor: color }]} />
-        <Text numberOfLines={1} style={styles.breakdownLabel}>
+        <Text {...singleLineShrinkProps} style={styles.breakdownLabel}>
           {label}
         </Text>
       </View>

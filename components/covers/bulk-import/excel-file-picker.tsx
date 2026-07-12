@@ -2,6 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { singleLineShrinkProps } from '@/constants/responsive-text';
 import type { ParsedExcelFile } from '@/features/covers/bulk-import/types';
 
 type ExcelFilePickerProps = {
@@ -32,7 +33,7 @@ export function ExcelFilePicker({ error, loading = false, onPickFile, parsedFile
             <View style={styles.previewHeaderRow}>
               <Text style={[styles.previewCell, styles.previewHeaderCell, styles.previewRowNumberCell]}>Row</Text>
               {parsedFile.headers.slice(0, 3).map((header) => (
-                <Text key={header} numberOfLines={1} style={[styles.previewCell, styles.previewHeaderCell]}>
+                <Text key={header} {...singleLineShrinkProps} style={[styles.previewCell, styles.previewHeaderCell]}>
                   {header}
                 </Text>
               ))}
@@ -41,7 +42,7 @@ export function ExcelFilePicker({ error, loading = false, onPickFile, parsedFile
               <View key={`preview-${row.rowNumber}`} style={styles.previewDataRow}>
                 <Text style={[styles.previewCell, styles.previewRowNumberCell]}>{row.rowNumber}</Text>
                 {parsedFile.headers.slice(0, 3).map((header) => (
-                  <Text key={`${row.rowNumber}-${header}`} numberOfLines={1} style={styles.previewCell}>
+                  <Text key={`${row.rowNumber}-${header}`} {...singleLineShrinkProps} style={styles.previewCell}>
                     {String(row.raw[header] ?? '')}
                   </Text>
                 ))}

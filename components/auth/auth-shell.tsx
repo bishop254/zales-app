@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { AppLogo } from '@/components/app/app-logo';
 import { palette, radius, spacing, typography } from '@/constants/app-theme';
+import { useResponsiveTypography } from '@/hooks/use-responsive-typography';
 
 type AuthShellProps = {
   children?: ReactNode;
@@ -12,12 +13,18 @@ type AuthShellProps = {
 };
 
 export function AuthShell({ children, footer, subtitle, title }: AuthShellProps) {
+  const responsiveType = useResponsiveTypography();
+
   return (
     <View style={styles.wrapper}>
       <View style={styles.header}>
         <AppLogo />
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+        <Text style={[styles.title, { fontSize: responsiveType.display, lineHeight: responsiveType.displayLineHeight }]}>
+          {title}
+        </Text>
+        <Text style={[styles.subtitle, { fontSize: responsiveType.body, lineHeight: responsiveType.bodyLineHeight }]}>
+          {subtitle}
+        </Text>
       </View>
       <View style={styles.card}>{children}</View>
       {footer ? <View style={styles.footer}>{footer}</View> : null}
